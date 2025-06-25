@@ -165,7 +165,7 @@ with col2:
     )
 
 st.file_uploader(
-    "Загрузите DOCX файл:",
+    "Загрузите DOCX файл с любым дополнительным контекстом (не более 300 тыс. символов):",
     type=["docx"],
     key="uploaded_file",
     on_change=lambda: parse_docx(st.session_state.uploaded_file)
