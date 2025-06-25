@@ -91,8 +91,9 @@ def create_pdf(content, title="Отчет"):
     
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
-    pdf.set_font('DejaVu', '', 12)
+    #pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
+    #pdf.set_font('DejaVu', '', 12)
+    pdf.set_font("Arial", size=12)
     pdf.write_html(html_content)
     return pdf.output(dest='S')
 
