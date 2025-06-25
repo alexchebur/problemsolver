@@ -6,6 +6,7 @@ from docx import Document
 from io import BytesIO
 from fpdf import FPDF
 import base64
+import os
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
@@ -77,12 +78,27 @@ def process_step(step_num, step_name, context, temperature):
         st.error(error_msg)
         return error_msg
 
-def create_pdf(content, title="Отчет Gemini"):
+def create_pdf(content, title="Отчет о решении проблемы"):
     """Создает PDF файл из текстового содержимого"""
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
-    pdf.set_font('DejaVu', '', 12)
+    
+    # Путь к шрифту в папке fonts репозитория
+    font_path = "fonts/DejaVuSansCondensed.ttf"
+    
+    # Проверяем существование файла шрифта
+    if not os.path.exists(font_path):
+        st.error(f"🚨 Файл шрифта не найден: {font_path}")
+        st.error("Убедитесь, что файл шрифта находится в папке fonts вашего репозитория")
+        return None
+    
+    try:
+        # Добавляем шрифт
+        pdf.add_font('DejaVu', '', font_path, uni=True)
+        pdf.set_font('DejaVu', '', 12)
+    except Exception as e:
+        st.error(f"🚨 Ошибка загрузки шрифта: {str(e)}")
+        return None
     
     # Заголовок
     pdf.set_font_size(16)
@@ -104,7 +120,11 @@ def create_pdf(content, title="Отчет Gemini"):
             pdf.ln(10)
             pdf.set_font_size(12)
         else:
-            pdf.multi_cell(0, 8, line)
+            # Удаляем лишние пробелы в начале строк
+            cleaned_line = line.lstrip()
+            # Пропускаем пустые строки
+            if cleaned_line:
+                pdf.multi_cell(0, 8, cleaned_line)
             pdf.ln(5)
     
     return pdf.output(dest='S').encode('latin1')
@@ -173,7 +193,7 @@ def generate_response():
         progress_bar.empty()
 
 # Интерфейс Streamlit
-st.title("The Troubleshooter")
+st.title("Gemini Troubleshooter")
 st.subheader("Анализ документов с применением когнитивных методов")
 
 # Основные элементы интерфейса
@@ -185,7 +205,7 @@ st.text_area(
     "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
     "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
     "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
-    height=200,
+    height=50,
     key="sys_prompt"
 )
 
@@ -204,7 +224,7 @@ with col2:
     )
 
 st.file_uploader(
-    "Загрузите DOCX файл с дополнительным контекстом (не более 300 тыс. символов):",
+    "Загрузите DOCX файл с дополнительным контекстом (желательно не более 200 тыс. символов):",
     type=["docx"],
     key="uploaded_file",
     on_change=lambda: parse_docx(st.session_state.uploaded_file)
@@ -227,8 +247,9 @@ if st.session_state.report_content:
     # Создаем PDF
     pdf_bytes = create_pdf(st.session_state.report_content)
     
-    # Формируем кнопку скачивания
-    b64 = base64.b64encode(pdf_bytes).decode()
-    filename = f"gemini_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">Скачать PDF отчет</a>'
-    st.markdown(href, unsafe_allow_html=True)
+    if pdf_bytes:
+        # Формируем кнопку скачивания
+        b64 = base64.b64encode(pdf_bytes).decode()
+        filename = f"gemini_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
+        href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">Скачать PDF отчет</a>'
+        st.markdown(href, unsafe_allow_html=True)
