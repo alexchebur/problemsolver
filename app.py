@@ -193,8 +193,8 @@ def generate_response():
         progress_bar.empty()
 
 # Интерфейс Streamlit
-st.title("Gemini Troubleshooter")
-st.subheader("Анализ документов с применением когнитивных методов")
+st.title("Troubleshooter - Решатель проблем")
+st.subheader("Решение проблем с применением когнитивных методов")
 
 # Основные элементы интерфейса
 st.text_area(
