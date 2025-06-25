@@ -197,17 +197,34 @@ st.title("Troubleshooter - Решатель проблем")
 st.subheader("Решение проблем с применением когнитивных методов")
 
 # Основные элементы интерфейса
-st.text_area(
-    "Системный промпт:",
-    value="Вы - troubleshooter, специалист по решению проблем в различных отраслях знаний и жизнедеятельности. "
-    "Помогайте пользователю исследовать проблему и предлагать пути ее решения. Руководствуйтесь методами First Principles Thinking, "
-    "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
-    "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
-    "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
-    "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
-    height=100,
-    key="sys_prompt"
-)
+# Боковая панель
+with st.sidebar:
+    st.title("🧠 Troubleshooter")
+    st.subheader("Решатель проблем")
+    
+    st.markdown("### Системный промпт:")
+    st.text_area(
+        "Системный промпт:",
+        value="Вы - troubleshooter, специалист по решению проблем в различных отраслях знаний и жизнедеятельности. "
+        "Помогайте пользователю исследовать проблему и предлагать пути ее решения. Руководствуйтесь методами First Principles Thinking, "
+        "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
+        "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
+        "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
+        "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
+        height=300,
+        key="sys_prompt"
+    )
+#st.text_area(
+#    "Системный промпт:",
+#    value="Вы - troubleshooter, специалист по решению проблем в различных отраслях знаний и жизнедеятельности. "
+#    "Помогайте пользователю исследовать проблему и предлагать пути ее решения. Руководствуйтесь методами First Principles Thinking, "
+#    "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
+#    "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
+#    "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
+#    "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
+#    height=100,
+#    key="sys_prompt"
+#)
 
 col1, col2 = st.columns([3, 1])
 with col1:
