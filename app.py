@@ -182,12 +182,6 @@ def generate_response():
             st.subheader("Промежуточные результаты")
             st.markdown(raw_report)
 
-    except Exception as e:
-        st.error(f"💥 Критическая ошибка: {str(e)}")
-        traceback.print_exception(e)
-    finally:
-        st.session_state.processing = False
-        progress_bar.empty()
 
 # Интерфейс Streamlit
 st.title("🧠Troubleshooter - Решатель проблем")
