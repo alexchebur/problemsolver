@@ -153,6 +153,7 @@ def generate_response():
             status_area.warning("⚠️ Загрузите документ")
             return
 
+        # Начальный контекст — только системный промпт + документ + запрос
         context = (
             f"{st.session_state.sys_prompt}\n"
             f"Документ:\n{st.session_state.current_doc_text}\n"
@@ -165,16 +166,42 @@ def generate_response():
                 progress = int((step_num + 1) / len(REASONING_STEPS) * 100)
                 progress_bar.progress(progress)
 
-                result = process_step(
-                    step_num,
-                    step_name,
-                    context,
-                    st.session_state.temperature
+                # Формируем prompt для текущего шага
+                prompt = (
+                    f"{step_name}\n"
+                    f"Контекст: {context}\n\n"
+                    "Ваш ответ должен быть полным, но не должен содержать упоминаний о шагах "
+                    "(например, не пишите 'На шаге 1...', 'В рамках первого этапа...')"
                 )
-                responses.append(result)
+
+                step_text = st.empty()
+                step_text.markdown(f"**🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}: {step_name}**")
+
+                try:
+                    response = model.generate_content(
+                        prompt,
+                        generation_config={
+                            "temperature": st.session_state.temperature,
+                            "max_output_tokens": 9000
+                        },
+                        request_options={'timeout': 60}
+                    )
+                    result = response.text
+                    step_text.markdown(f"**✅ Шаг {step_num+1} завершен**")
+                    st.markdown(f"---\n{result}\n---")
+                    responses.append(result)
+
+                    # Добавляем результат текущего шага в контекст для следующих шагов
+                    context += f"\n\nРезультат шага {step_num+1} ({step_name}): {result}"
+
+                except Exception as e:
+                    error_msg = f"🚨 Ошибка на шаге {step_num+1}: {str(e)}"
+                    st.error(error_msg)
+                    responses.append(error_msg)
+
                 time.sleep(1)
 
-        # Сохраняем объединенные результаты без итогового обобщения от Gemini
+        # Сохраняем объединенные результаты
         raw_report = ""
         for i, response in enumerate(responses):
             raw_report += f"### Шаг {i + 1}: {REASONING_STEPS[i]}\n\n{response}\n\n"
@@ -207,7 +234,7 @@ with st.sidebar:
               "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
               "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
               "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
-              "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
+              "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Вы будете выполнять несколько шагов анализа. Ответы должны быть согласованы между собой. Следующие шаги будут опираться на выводы предыдущих." Отвечайте по-русски",
         height=300,
         key="sys_prompt"
     )
