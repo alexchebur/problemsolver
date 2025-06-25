@@ -205,7 +205,7 @@ st.text_area(
     "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
     "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
     "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
-    height=50,
+    height=100,
     key="sys_prompt"
 )
 
