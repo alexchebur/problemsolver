@@ -127,7 +127,8 @@ def create_pdf(content, title="Отчет о решении проблемы"):
                 pdf.multi_cell(0, 8, cleaned_line)
             pdf.ln(5)
     
-    return pdf.output(dest='S').encode('latin1')
+    # --- ИСПРАВЛЕНИЕ: убираем .encode('latin1') ---
+    return pdf.output(dest='S')  # Возвращает bytes (для fpdf2 >= 2.0)
 
 def generate_response():
     st.session_state.processing = True
