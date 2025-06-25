@@ -2,3 +2,4 @@
    google-generativeai
    python-docx
    fpdf2
+   markdown2
