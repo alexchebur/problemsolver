@@ -97,7 +97,7 @@ def generate_response():
         responses = []
         with results_container:
             for step_num, step_name in enumerate(REASONING_STEPS):
-                progress = int((step_num+1)/len(REASONING_STEPS)*100
+                progress = int((step_num+1)/len(REASONING_STEPS)*100)
                 progress_bar.progress(progress)
                 
                 result = process_step(
