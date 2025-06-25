@@ -7,6 +7,7 @@ from io import BytesIO
 from fpdf import FPDF
 import base64
 import os
+from markdown2 import Markdown
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
@@ -84,57 +85,16 @@ def process_step(step_num, step_name, context, temperature):
         st.error(error_msg)
         return error_msg
 
-def create_pdf(content, title="Отчет о решении проблемы"):
-    """Создает PDF файл из текстового содержимого"""
+def create_pdf(content, title="Отчет"):
+    markdowner = Markdown()
+    html_content = markdowner.convert(content)
+    
     pdf = FPDF()
     pdf.add_page()
-
-    # Путь к шрифту в папке fonts репозитория
-    font_path = "fonts/DejaVuSansCondensed.ttf"
-
-    # Проверяем существование файла шрифта
-    if not os.path.exists(font_path):
-        st.error(f"🚨 Файл шрифта не найден: {font_path}")
-        st.error("Убедитесь, что файл шрифта находится в папке fonts вашего репозитория")
-        return None
-
-    try:
-        # Добавляем шрифт
-        pdf.add_font('DejaVu', '', font_path, uni=True)
-        pdf.set_font('DejaVu', '', 12)
-    except Exception as e:
-        st.error(f"🚨 Ошибка загрузки шрифта: {str(e)}")
-        return None
-
-    # Заголовок
-    pdf.set_font_size(16)
-    pdf.cell(0, 10, title, 0, 1, 'C')
-    pdf.ln(10)
-
-    # Основной текст
-    pdf.set_font_size(12)
-    for line in content.split('\n'):
-        # Обработка заголовков Markdown
-        if line.startswith('## '):
-            pdf.set_font_size(14)
-            pdf.cell(0, 10, line[3:], 0, 1)
-            pdf.ln(5)
-            pdf.set_font_size(12)
-        elif line.startswith('# '):
-            pdf.set_font_size(16)
-            pdf.cell(0, 10, line[2:], 0, 1, 'C')
-            pdf.ln(10)
-            pdf.set_font_size(12)
-        else:
-            # Удаляем лишние пробелы в начале строк
-            cleaned_line = line.lstrip()
-            # Пропускаем пустые строки
-            if cleaned_line:
-                pdf.multi_cell(0, 8, cleaned_line)
-            pdf.ln(5)
-
-    # --- Совместимость с fpdf2 >= 2.0 ---
-    return pdf.output(dest='S')  # Возвращает bytes
+    pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
+    pdf.set_font('DejaVu', '', 12)
+    pdf.write_html(html_content)
+    return pdf.output(dest='S')
 
 def generate_response():
     st.session_state.processing = True
