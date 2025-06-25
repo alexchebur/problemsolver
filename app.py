@@ -234,7 +234,7 @@ with st.sidebar:
               "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
               "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
               "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
-              "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Вы будете выполнять несколько шагов анализа. Ответы должны быть согласованы между собой. Следующие шаги будут опираться на выводы предыдущих." Отвечайте по-русски",
+              "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Вы будете выполнять несколько шагов анализа. Ответы должны быть согласованы между собой. Следующие шаги будут опираться на выводы предыдущих. Числовые ряды и последовательности данных представляйте в формате ASCII-диаграмм. Отвечайте по-русски",
         height=300,
         key="sys_prompt"
     )
