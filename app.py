@@ -1,10 +1,11 @@
-
 import streamlit as st
 import google.generativeai as genai
 import time
 import traceback
 from docx import Document
 from io import BytesIO
+from fpdf import FPDF
+import base64
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
@@ -28,6 +29,8 @@ if 'current_doc_text' not in st.session_state:
     st.session_state.current_doc_text = ""
 if 'processing' not in st.session_state:
     st.session_state.processing = False
+if 'report_content' not in st.session_state:
+    st.session_state.report_content = None
 
 REASONING_STEPS = [
     "Анализ контекста и запроса пользователя (не менее 5000 знаков, НЕ УПОМИНАЙ количество знаков)",
@@ -74,8 +77,41 @@ def process_step(step_num, step_name, context, temperature):
         st.error(error_msg)
         return error_msg
 
+def create_pdf(content, title="Отчет Gemini"):
+    """Создает PDF файл из текстового содержимого"""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+    pdf.set_font('DejaVu', '', 12)
+    
+    # Заголовок
+    pdf.set_font_size(16)
+    pdf.cell(0, 10, title, 0, 1, 'C')
+    pdf.ln(10)
+    
+    # Основной текст
+    pdf.set_font_size(12)
+    for line in content.split('\n'):
+        # Обработка заголовков Markdown
+        if line.startswith('## '):
+            pdf.set_font_size(14)
+            pdf.cell(0, 10, line[3:], 0, 1)
+            pdf.ln(5)
+            pdf.set_font_size(12)
+        elif line.startswith('# '):
+            pdf.set_font_size(16)
+            pdf.cell(0, 10, line[2:], 0, 1, 'C')
+            pdf.ln(10)
+            pdf.set_font_size(12)
+        else:
+            pdf.multi_cell(0, 8, line)
+            pdf.ln(5)
+    
+    return pdf.output(dest='S').encode('latin1')
+
 def generate_response():
     st.session_state.processing = True
+    st.session_state.report_content = None
     status_area = st.empty()
     progress_bar = st.progress(0)
     results_container = st.container()
@@ -123,6 +159,9 @@ def generate_response():
             st.subheader("Итоговый отчет")
             st.markdown(final_response.text)
             
+            # Сохраняем отчет для экспорта
+            st.session_state.report_content = final_response.text
+            
         except Exception as e:
             st.error(f"🚨 Ошибка формирования отчета: {str(e)}")
 
@@ -134,7 +173,7 @@ def generate_response():
         progress_bar.empty()
 
 # Интерфейс Streamlit
-st.title("Gemini Troubleshooter")
+st.title("The Troubleshooter")
 st.subheader("Анализ документов с применением когнитивных методов")
 
 # Основные элементы интерфейса
@@ -165,7 +204,7 @@ with col2:
     )
 
 st.file_uploader(
-    "Загрузите DOCX файл с любым дополнительным контекстом (не более 300 тыс. символов):",
+    "Загрузите DOCX файл с дополнительным контекстом (не более 300 тыс. символов):",
     type=["docx"],
     key="uploaded_file",
     on_change=lambda: parse_docx(st.session_state.uploaded_file)
@@ -179,3 +218,17 @@ if st.button("Отправить", disabled=st.session_state.processing):
 
 if st.session_state.processing:
     st.info("Обработка запроса...")
+
+# Кнопка скачивания PDF
+if st.session_state.report_content:
+    st.divider()
+    st.subheader("Экспорт результатов")
+    
+    # Создаем PDF
+    pdf_bytes = create_pdf(st.session_state.report_content)
+    
+    # Формируем кнопку скачивания
+    b64 = base64.b64encode(pdf_bytes).decode()
+    filename = f"gemini_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">Скачать PDF отчет</a>'
+    st.markdown(href, unsafe_allow_html=True)
