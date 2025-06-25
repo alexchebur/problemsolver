@@ -169,18 +169,18 @@ def generate_response():
                 time.sleep(1)
 
        
-            # Просто объединяем все результаты шагов без обобщения от модели
-            raw_report = ""
-            for i, response in enumerate(responses):
-                raw_report += f"### Шаг {i+1}: {REASONING_STEPS[i]}\n\n{response}\n\n"
+# Просто объединяем все результаты шагов без обобщения от модели
+raw_report = ""
+for i, response in enumerate(responses):
+    raw_report += f"### Шаг {i+1}: {REASONING_STEPS[i]}\n\n{response}\n\n"
 
-            # Сохраняем объединённые результаты в session_state для PDF
-            st.session_state.report_content = raw_report
+# Сохраняем объединённые результаты в session_state для PDF
+st.session_state.report_content = raw_report
 
-            # Выводим в интерфейс
-            st.divider()
-            st.subheader("Промежуточные результаты")
-            st.markdown(raw_report)
+# Выводим в интерфейс
+st.divider()
+st.subheader("Промежуточные результаты")
+st.markdown(raw_report)
 
 
 # Интерфейс Streamlit
