@@ -10,7 +10,6 @@ import os
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
-#st.secrets.get('GEMINI_API_KEY') or st.text_input("Введите API-ключ:", type="password")
 if not api_key:
     st.warning("Пожалуйста, введите API-ключ")
     st.stop()
@@ -34,9 +33,9 @@ if 'report_content' not in st.session_state:
     st.session_state.report_content = None
 
 REASONING_STEPS = [
-    "Анализ контекста и запроса пользователя (не менее 5000 знаков, НЕ УПОМИНАЙ количество знаков)",
-    "Применение когнитивных подходов и методов решения проблем(не менее 5000 знаков, НЕ УПОМИНАЙ количество знаков)",
-    "Формулирование итогового вывода и оптимальных решений(не менее 5000 знаков, НЕ УПОМИНАЙ количество знаков)"
+    "Анализ контекста и запроса пользователя",
+    "Применение когнитивных подходов и методов решения проблем",
+    "Формулирование итогового вывода и оптимальных решений"
 ]
 
 def parse_docx(uploaded_file):
@@ -58,9 +57,16 @@ def process_step(step_num, step_name, context, temperature):
     try:
         step_text = st.empty()
         step_text.markdown(f"**🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}: {step_name}**")
-        
+
+        prompt = (
+            f"{step_name}\n"
+            f"Контекст: {context}\n\n"
+            "Ваш ответ должен быть полным, но не должен содержать упоминаний о шагах "
+            "(например, не пишите 'На шаге 1...', 'В рамках первого этапа...')"
+        )
+
         response = model.generate_content(
-            f"Выполните шаг {step_num+1}: {step_name}\nКонтекст: {context}",
+            prompt,
             generation_config={
                 "temperature": temperature,
                 "max_output_tokens": 9000
@@ -82,16 +88,16 @@ def create_pdf(content, title="Отчет о решении проблемы"):
     """Создает PDF файл из текстового содержимого"""
     pdf = FPDF()
     pdf.add_page()
-    
+
     # Путь к шрифту в папке fonts репозитория
     font_path = "fonts/DejaVuSansCondensed.ttf"
-    
+
     # Проверяем существование файла шрифта
     if not os.path.exists(font_path):
         st.error(f"🚨 Файл шрифта не найден: {font_path}")
         st.error("Убедитесь, что файл шрифта находится в папке fonts вашего репозитория")
         return None
-    
+
     try:
         # Добавляем шрифт
         pdf.add_font('DejaVu', '', font_path, uni=True)
@@ -99,12 +105,12 @@ def create_pdf(content, title="Отчет о решении проблемы"):
     except Exception as e:
         st.error(f"🚨 Ошибка загрузки шрифта: {str(e)}")
         return None
-    
+
     # Заголовок
     pdf.set_font_size(16)
     pdf.cell(0, 10, title, 0, 1, 'C')
     pdf.ln(10)
-    
+
     # Основной текст
     pdf.set_font_size(12)
     for line in content.split('\n'):
@@ -126,9 +132,9 @@ def create_pdf(content, title="Отчет о решении проблемы"):
             if cleaned_line:
                 pdf.multi_cell(0, 8, cleaned_line)
             pdf.ln(5)
-    
-    # --- ИСПРАВЛЕНИЕ: убираем .encode('latin1') ---
-    return pdf.output(dest='S')  # Возвращает bytes (для fpdf2 >= 2.0)
+
+    # --- Совместимость с fpdf2 >= 2.0 ---
+    return pdf.output(dest='S')  # Возвращает bytes
 
 def generate_response():
     st.session_state.processing = True
@@ -136,7 +142,7 @@ def generate_response():
     status_area = st.empty()
     progress_bar = st.progress(0)
     results_container = st.container()
-    
+
     try:
         query = st.session_state.input_query.strip()
         if not query:
@@ -156,67 +162,57 @@ def generate_response():
         responses = []
         with results_container:
             for step_num, step_name in enumerate(REASONING_STEPS):
-                progress = int((step_num+1)/len(REASONING_STEPS)*100)
+                progress = int((step_num + 1) / len(REASONING_STEPS) * 100)
                 progress_bar.progress(progress)
-                
+
                 result = process_step(
-                    step_num, 
-                    step_name, 
-                    context, 
+                    step_num,
+                    step_name,
+                    context,
                     st.session_state.temperature
                 )
                 responses.append(result)
                 time.sleep(1)
 
-       
-# Просто объединяем все результаты шагов без обобщения от модели
-raw_report = ""
-for i, response in enumerate(responses):
-    raw_report += f"### Шаг {i+1}: {REASONING_STEPS[i]}\n\n{response}\n\n"
+        # Сохраняем объединенные результаты без итогового обобщения от Gemini
+        raw_report = ""
+        for i, response in enumerate(responses):
+            raw_report += f"### Шаг {i + 1}: {REASONING_STEPS[i]}\n\n{response}\n\n"
 
-# Сохраняем объединённые результаты в session_state для PDF
-st.session_state.report_content = raw_report
+        st.session_state.report_content = raw_report
 
-# Выводим в интерфейс
-st.divider()
-st.subheader("Промежуточные результаты")
-st.markdown(raw_report)
+        # Выводим в интерфейс
+        st.divider()
+        st.subheader("Результаты по каждому шагу")
+        st.markdown(raw_report)
 
+    except Exception as e:
+        st.error(f"💥 Критическая ошибка: {str(e)}")
+        traceback.print_exception(e)
+    finally:
+        st.session_state.processing = False
+        progress_bar.empty()
 
 # Интерфейс Streamlit
-st.title("🧠Troubleshooter - Решатель проблем")
-st.subheader("Решение проблем с применением когнитивных методов")
-
-# Основные элементы интерфейса
-# Боковая панель
+# --- Боковая панель ---
 with st.sidebar:
     st.title("🧠 Troubleshooter")
     st.subheader("Решатель проблем")
-    
+
     st.markdown("### Системный промпт:")
     st.text_area(
         "Системный промпт:",
         value="Вы - troubleshooter, специалист по решению проблем в различных отраслях знаний и жизнедеятельности. "
-        "Помогайте пользователю исследовать проблему и предлагать пути ее решения. Руководствуйтесь методами First Principles Thinking, "
-        "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
-        "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
-        "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
-        "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
+              "Помогайте пользователю исследовать проблему и предлагать пути ее решения. Руководствуйтесь методами First Principles Thinking, "
+              "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
+              "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
+              "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
+              "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
         height=300,
         key="sys_prompt"
     )
-#st.text_area(
-#    "Системный промпт:",
-#    value="Вы - troubleshooter, специалист по решению проблем в различных отраслях знаний и жизнедеятельности. "
-#    "Помогайте пользователю исследовать проблему и предлагать пути ее решения. Руководствуйтесь методами First Principles Thinking, "
-#    "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
-#    "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
-#    "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
-#    "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Отвечайте по-русски",
-#    height=100,
-#    key="sys_prompt"
-#)
 
+# --- Основная область ---
 col1, col2 = st.columns([3, 1])
 with col1:
     st.text_input(
@@ -226,7 +222,7 @@ with col1:
     )
 with col2:
     st.slider(
-        "Температура (чем выше, тем больше отсебятины):",
+        "Температура:",
         0.0, 1.0, 0.3, 0.1,
         key="temperature"
     )
@@ -247,17 +243,17 @@ if st.button("Отправить", disabled=st.session_state.processing):
 if st.session_state.processing:
     st.info("Обработка запроса...")
 
-# Кнопка скачивания PDF
+# --- Экспорт PDF ---
 if st.session_state.report_content:
     st.divider()
     st.subheader("Экспорт результатов")
-    
+
     # Создаем PDF
     pdf_bytes = create_pdf(st.session_state.report_content)
-    
+
     if pdf_bytes:
         # Формируем кнопку скачивания
         b64 = base64.b64encode(pdf_bytes).decode()
         filename = f"gemini_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
-        href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">Скачать PDF отчет</a>'
+        href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">📥 Скачать PDF отчет</a>'
         st.markdown(href, unsafe_allow_html=True)
