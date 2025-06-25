@@ -7,7 +7,8 @@ from docx import Document
 from io import BytesIO
 
 # Настройка API
-api_key = st.secrets.get('GEMINI_API_KEY') or st.text_input("Введите API-ключ:", type="password")
+api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
+#st.secrets.get('GEMINI_API_KEY') or st.text_input("Введите API-ключ:", type="password")
 if not api_key:
     st.warning("Пожалуйста, введите API-ключ")
     st.stop()
