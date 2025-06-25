@@ -168,7 +168,7 @@ def generate_response():
                 responses.append(result)
                 time.sleep(1)
 
-        try:
+       
             # Просто объединяем все результаты шагов без обобщения от модели
             raw_report = ""
             for i, response in enumerate(responses):
