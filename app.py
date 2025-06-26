@@ -2,12 +2,11 @@ import streamlit as st
 import google.generativeai as genai
 import time
 import traceback
-import re
 from docx import Document
 from io import BytesIO
 from fpdf import FPDF
 import base64
-import html
+import textwrap
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
@@ -39,29 +38,6 @@ REASONING_STEPS = [
     "Третья часть отчета: выбор оптимальных решений и выводы. Выбери оптимальные решения на основе {context}, подробно детализируй каждое из оптимальных решений."
 ]
 
-# Функция для очистки текста от проблемных символов
-def clean_text(text):
-    if not text:
-        return ""
-    
-    # Удаляем проблемные последовательности символов
-    text = re.sub(r'(?<!\\)([\{\}])', r'\\\1', text)  # Экранируем фигурные скобки
-    text = re.sub(r'([\[\]])', r'\\\1', text)  # Экранируем квадратные скобки
-    text = re.sub(r'([\(\)])', r'\\\1', text)  # Экранируем круглые скобки
-    text = re.sub(r'(\$)', r'\\\1', text)  # Экранируем знаки доллара
-    text = re.sub(r'(\^)', r'\\\1', text)  # Экранируем каретки
-    
-    # Заменяем HTML-сущности
-    text = html.unescape(text)
-    
-    # Удаляем непечатаемые символы
-    text = re.sub(r'[\x00-\x1F\x7F-\x9F]', ' ', text)
-    
-    # Заменяем последовательности пробелов на один пробел
-    text = re.sub(r'\s+', ' ', text)
-    
-    return text.strip()
-
 def parse_docx(uploaded_file):
     try:
         if uploaded_file is None:
@@ -69,7 +45,7 @@ def parse_docx(uploaded_file):
 
         doc = Document(BytesIO(uploaded_file.getvalue()))
         full_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-        st.session_state.current_doc_text = clean_text(full_text)[:400000]
+        st.session_state.current_doc_text = full_text[:400000]
         st.success(f"📂 Документ загружен: {len(st.session_state.current_doc_text)} символов")
         return True
     except Exception as e:
@@ -80,29 +56,36 @@ def parse_docx(uploaded_file):
 def create_pdf(content, title="Отчет"):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+    pdf.set_font('DejaVu', '', 12)
     
     # Добавляем контент с переносами строк
     for line in content.split('\n'):
-        pdf.multi_cell(0, 8, txt=line, align='L')
-        pdf.ln(2)
+        # Разбиваем длинные строки на несколько строк
+        wrapped_lines = textwrap.wrap(line, width=100)
+        if not wrapped_lines:
+            pdf.ln(5)  # Пустая строка
+            continue
+            
+        for wrapped_line in wrapped_lines:
+            pdf.cell(0, 8, txt=wrapped_line, ln=1)
     
     return pdf.output(dest='S').encode('latin-1')
 
 def generate_response():
     st.session_state.processing = True
     st.session_state.report_content = None
+    status_area = st.empty()
     progress_bar = st.progress(0)
-    results_container = st.container()
 
     try:
-        query = clean_text(st.session_state.input_query.strip())
+        query = st.session_state.input_query.strip()
         if not query:
-            st.warning("⚠️ Введите запрос")
+            status_area.warning("⚠️ Введите запрос")
             return
 
         if not st.session_state.current_doc_text:
-            st.warning("⚠️ Загрузите документ")
+            status_area.warning("⚠️ Загрузите документ")
             return
 
         # Начальный контекст
@@ -115,58 +98,70 @@ def generate_response():
         responses = []
         full_report = ""
         
-        with results_container:
-            for step_num, step_template in enumerate(REASONING_STEPS):
-                progress = int((step_num + 1) / len(REASONING_STEPS) * 100)
-                progress_bar.progress(progress)
-                
-                # Формируем промпт для шага
-                step_prompt = step_template.format(
-                    query=query,
-                    context=context,
-                    sys_prompt=st.session_state.sys_prompt
+        for step_num, step_template in enumerate(REASONING_STEPS):
+            progress = int((step_num + 1) / len(REASONING_STEPS) * 100)
+            progress_bar.progress(progress)
+            
+            # Формируем промпт для шага
+            step_name = step_template.format(
+                query=query,
+                context=context,
+                sys_prompt=st.session_state.sys_prompt
+            )
+            
+            # Используем контейнер для каждого шага
+            step_container = st.container()
+            step_container.subheader(f"🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}")
+            
+            try:
+                response = model.generate_content(
+                    step_name,
+                    generation_config={
+                        "temperature": st.session_state.temperature,
+                        "max_output_tokens": 9000
+                    },
+                    request_options={'timeout': 120}
                 )
                 
-                st.markdown(f"**🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}**")
+                result = response.text
+                responses.append(result)
                 
-                try:
-                    response = model.generate_content(
-                        step_prompt,
-                        generation_config={
-                            "temperature": st.session_state.temperature,
-                            "max_output_tokens": 9000
-                        },
-                        request_options={'timeout': 120}
-                    )
-                    
-                    result = clean_text(response.text)
-                    responses.append(result)
-                    
-                    # Добавляем результат в контекст
-                    context += f"\n\nРезультат шага {step_num+1}: {result[:500]}..."
-                    
-                    # Отображаем результат с безопасным Markdown
-                    st.markdown(f"**✅ Шаг {step_num+1} завершен**")
-                    st.markdown(f"```\n{result}\n```")
-                    
-                    full_report += f"### Шаг {step_num+1} ###\n\n{result}\n\n{'='*50}\n\n"
-                    
-                except Exception as e:
-                    error_msg = f"🚨 Ошибка на шаге {step_num+1}: {str(e)}"
-                    st.error(error_msg)
-                    responses.append(error_msg)
-                    full_report += f"### Ошибка на шаге {step_num+1} ###\n\n{error_msg}\n\n"
+                # Добавляем результат в контекст
+                context += f"\n\nРезультат шага {step_num+1}: {result[:500]}..."
+                
+                # Отображаем результат без markdown
+                step_container.subheader(f"✅ Шаг {step_num+1} завершен")
+                step_container.text_area(
+                    label="Результат:",
+                    value=result,
+                    height=300,
+                    disabled=True
+                )
+                
+                full_report += f"### Шаг {step_num+1} ###\n\n{result}\n\n{'='*50}\n\n"
+                
+            except Exception as e:
+                error_msg = f"🚨 Ошибка на шаге {step_num+1}: {str(e)}"
+                step_container.error(error_msg)
+                responses.append(error_msg)
+                full_report += f"### Ошибка на шаге {step_num+1} ###\n\n{error_msg}\n\n"
 
-                time.sleep(1)
+            time.sleep(1)
 
-        st.session_state.report_content = clean_text(full_report)
+        st.session_state.report_content = full_report
         progress_bar.empty()
         st.success("✅ Обработка завершена!")
         
-        # Показываем полный отчет
+        # Показываем полный отчет в текстовом поле
         st.divider()
         st.subheader("Полный отчет")
-        st.markdown(f"```\n{st.session_state.report_content}\n```")
+        st.text_area(
+            label="Содержание отчета:",
+            value=full_report,
+            height=400,
+            disabled=True,
+            key="report_textarea"
+        )
 
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
@@ -181,16 +176,13 @@ with st.sidebar:
     st.subheader("Решатель проблем")
 
     st.markdown("### Системный промпт:")
-    sys_prompt_default = clean_text(
-        "Вы - troubleshooter, специалист по решению проблем. "
-        "Помогайте пользователю исследовать проблему и предлагать пути ее решения. "
-        "Руководствуйтесь методами First Principles Thinking, Inversion, Pareto Principle. "
-        "Ответы должны быть согласованы между собой. "
-        "Числовые ряды представляйте в формате ASCII-диаграмм. Отвечайте по-русски."
-    )
     st.session_state.sys_prompt = st.text_area(
         label="Системный промпт:",
-        value=sys_prompt_default,
+        value="Вы - troubleshooter, специалист по решению проблем. "
+              "Помогайте пользователю исследовать проблему и предлагать пути ее решения. "
+              "Руководствуйтесь методами First Principles Thinking, Inversion, Pareto Principle. "
+              "Ответы должны быть согласованы между собой. "
+              "Числовые ряды представляйте в формате ASCII-диаграмм. Отвечайте по-русски.",
         height=250,
         label_visibility="collapsed"
     )
