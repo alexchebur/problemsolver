@@ -184,7 +184,7 @@ def generate_response():
 # Интерфейс Streamlit
 # --- Боковая панель ---
 with st.sidebar:
-    st.title(f"<pre>"🧠 Troubleshooter"</pre>", unsafe_allow_html=True)
+    st.title(f"<pre>" Troubleshooter"</pre>", unsafe_allow_html=True)
     st.subheader(f"<pre>"Решатель проблем"</pre>", unsafe_allow_html=True)
 
     st.text(f"<pre>"### Системный промпт:"</pre>", unsafe_allow_html=True) 
@@ -201,7 +201,7 @@ with st.sidebar:
     )
 
 # --- Основная область ---
-st.title(f"<pre>"🧠 Troubleshooter - Решатель проблем"</pre>", unsafe_allow_html=True)
+st.title(f"<pre>" Troubleshooter - Решатель проблем"</pre>", unsafe_allow_html=True)
 st.subheader("Решение проблем с применением когнитивных методов на основе контекста в документе Word")
 col1, col2 = st.columns([3, 1])
 with col1:
