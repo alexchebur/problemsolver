@@ -6,7 +6,7 @@ from docx import Document
 from io import BytesIO
 from fpdf import FPDF
 import base64
-import textwrap
+import os
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
@@ -59,24 +59,18 @@ def create_pdf(content, title="Отчет"):
     pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
     pdf.set_font('DejaVu', '', 12)
     
-    # Добавляем контент с переносами строк
+    # Упрощенное добавление текста
     for line in content.split('\n'):
-        # Разбиваем длинные строки на несколько строк
-        wrapped_lines = textwrap.wrap(line, width=100)
-        if not wrapped_lines:
-            pdf.ln(5)  # Пустая строка
-            continue
-            
-        for wrapped_line in wrapped_lines:
-            pdf.cell(0, 8, txt=wrapped_line, ln=1)
+        pdf.cell(0, 10, txt=line, ln=1)
     
-    return pdf.output(dest='S').encode('latin-1')
+    return pdf.output(dest='S').encode('latin1')
 
 def generate_response():
     st.session_state.processing = True
     st.session_state.report_content = None
     status_area = st.empty()
     progress_bar = st.progress(0)
+    results_container = st.empty()
 
     try:
         query = st.session_state.input_query.strip()
@@ -98,70 +92,58 @@ def generate_response():
         responses = []
         full_report = ""
         
-        for step_num, step_template in enumerate(REASONING_STEPS):
-            progress = int((step_num + 1) / len(REASONING_STEPS) * 100)
-            progress_bar.progress(progress)
-            
-            # Формируем промпт для шага
-            step_name = step_template.format(
-                query=query,
-                context=context,
-                sys_prompt=st.session_state.sys_prompt
-            )
-            
-            # Используем контейнер для каждого шага
-            step_container = st.container()
-            step_container.subheader(f"🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}")
-            
-            try:
-                response = model.generate_content(
-                    step_name,
-                    generation_config={
-                        "temperature": st.session_state.temperature,
-                        "max_output_tokens": 9000
-                    },
-                    request_options={'timeout': 120}
+        with st.spinner("Обработка запроса..."):
+            for step_num, step_template in enumerate(REASONING_STEPS):
+                progress = int((step_num + 1) / len(REASONING_STEPS) * 100)
+                progress_bar.progress(progress)
+                
+                # Формируем промпт для шага
+                step_name = step_template.format(
+                    query=query,
+                    context=context,
+                    sys_prompt=st.session_state.sys_prompt
                 )
                 
-                result = response.text
-                responses.append(result)
+                st.markdown(f"**🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}**")
                 
-                # Добавляем результат в контекст
-                context += f"\n\nРезультат шага {step_num+1}: {result[:500]}..."
-                
-                # Отображаем результат без markdown
-                step_container.subheader(f"✅ Шаг {step_num+1} завершен")
-                step_container.text_area(
-                    label="Результат:",
-                    value=result,
-                    height=300,
-                    disabled=True
-                )
-                
-                full_report += f"### Шаг {step_num+1} ###\n\n{result}\n\n{'='*50}\n\n"
-                
-            except Exception as e:
-                error_msg = f"🚨 Ошибка на шаге {step_num+1}: {str(e)}"
-                step_container.error(error_msg)
-                responses.append(error_msg)
-                full_report += f"### Ошибка на шаге {step_num+1} ###\n\n{error_msg}\n\n"
+                try:
+                    response = model.generate_content(
+                        step_name,
+                        generation_config={
+                            "temperature": st.session_state.temperature,
+                            "max_output_tokens": 9000
+                        },
+                        request_options={'timeout': 120}
+                    )
+                    
+                    result = response.text
+                    responses.append(result)
+                    
+                    # Добавляем результат в контекст
+                    context += f"\n\nРезультат шага {step_num+1}: {result[:500]}..."
+                    
+                    # Отображаем результат
+                    with st.expander(f"✅ Шаг {step_num+1} завершен", expanded=True):
+                        st.code(result, language='text')
+                    
+                    full_report += f"### Шаг {step_num+1} ###\n\n{result}\n\n{'='*50}\n\n"
+                    
+                except Exception as e:
+                    error_msg = f"🚨 Ошибка на шаге {step_num+1}: {str(e)}"
+                    st.error(error_msg)
+                    responses.append(error_msg)
+                    full_report += f"### Ошибка на шаге {step_num+1} ###\n\n{error_msg}\n\n"
 
-            time.sleep(1)
+                time.sleep(1)
 
         st.session_state.report_content = full_report
         progress_bar.empty()
         st.success("✅ Обработка завершена!")
         
-        # Показываем полный отчет в текстовом поле
+        # Показываем полный отчет
         st.divider()
         st.subheader("Полный отчет")
-        st.text_area(
-            label="Содержание отчета:",
-            value=full_report,
-            height=400,
-            disabled=True,
-            key="report_textarea"
-        )
+        st.code(full_report, language='text')
 
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
@@ -177,7 +159,7 @@ with st.sidebar:
 
     st.markdown("### Системный промпт:")
     st.session_state.sys_prompt = st.text_area(
-        label="Системный промпт:",
+        "",
         value="Вы - troubleshooter, специалист по решению проблем. "
               "Помогайте пользователю исследовать проблему и предлагать пути ее решения. "
               "Руководствуйтесь методами First Principles Thinking, Inversion, Pareto Principle. "
@@ -222,14 +204,17 @@ if st.session_state.report_content and not st.session_state.processing:
     st.divider()
     st.subheader("Экспорт результатов")
     
-    # PDF экспорт
+    # Текстовый экспорт
+    b64_txt = base64.b64encode(st.session_state.report_content.encode()).decode()
+    txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT отчет</a>'
+    st.markdown(txt_href, unsafe_allow_html=True)
+    
+    # PDF экспорт (упрощенный)
     try:
         pdf_bytes = create_pdf(st.session_state.report_content)
-        if pdf_bytes:
-            b64 = base64.b64encode(pdf_bytes).decode()
-            filename = f"gemini_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
-            href = f'<a href="data:application/pdf;base64,{b64}" download="{filename}">📥 Скачать PDF отчет</a>'
-            st.markdown(href, unsafe_allow_html=True)
+        b64_pdf = base64.b64encode(pdf_bytes).decode()
+        pdf_href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="report.pdf">📥 Скачать PDF отчет</a>'
+        st.markdown(pdf_href, unsafe_allow_html=True)
     except Exception as e:
         st.warning(f"Не удалось создать PDF: {str(e)}")
 
