@@ -77,7 +77,7 @@ def process_step(step_num, step_name, context, temperature):
 
         result = response.text
         step_text.code(f"**✅ Шаг {step_num+1} завершен**")
-        st.code(f"<pre>{result}</pre>", unsafe_allow_html=True)
+        st.text(f"<pre>{result}</pre>", unsafe_allow_html=True)
         return result
 
     except Exception as e:
@@ -149,7 +149,7 @@ def generate_response():
                     )
                     result = response.text
                     step_text.markdown(f"**✅ Шаг {step_num+1} завершен**")
-                    st.code(f"<pre>{result}</pre>", unsafe_allow_html=True)
+                    st.text(f"<pre>{result}</pre>", unsafe_allow_html=True)
                     responses.append(result)
 
                     # Добавляем результат текущего шага в контекст для следующих шагов
@@ -172,7 +172,7 @@ def generate_response():
         # Выводим в интерфейс
         st.divider()
         st.subheader("Результаты по каждому шагу")
-        st.code(raw_report) 
+        st.text(raw_report) 
 
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
@@ -187,7 +187,7 @@ with st.sidebar:
     st.title(f"<pre>"🧠 Troubleshooter"</pre>", unsafe_allow_html=True)
     st.subheader(f"<pre>"Решатель проблем"</pre>", unsafe_allow_html=True)
 
-    st.code(f"<pre>"### Системный промпт:"</pre>", unsafe_allow_html=True) 
+    st.text(f"<pre>"### Системный промпт:"</pre>", unsafe_allow_html=True) 
     st.text_area(
         "Системный промпт:",
         value="Вы - troubleshooter, специалист по решению проблем в различных отраслях знаний и жизнедеятельности. "
@@ -246,4 +246,4 @@ if st.session_state.report_content:
         b64 = base64.b64encode(pdf_bytes).decode()
         filename = f"gemini_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
         href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">📥 Скачать PDF отчет</a>'
-        st.code(href, unsafe_allow_html=True)
+        st.text(href, unsafe_allow_html=True)
