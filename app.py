@@ -77,7 +77,7 @@ def process_step(step_num, step_name, context, temperature):
 
         result = response.text
         step_text.markdown(f"**✅ Шаг {step_num+1} завершен**")
-        st.markdown(f"---\n{result}\n---")
+        st.markdown(f"<pre>{result}</pre>", unsafe_allow_html=True)
         return result
 
     except Exception as e:
@@ -149,7 +149,7 @@ def generate_response():
                     )
                     result = response.text
                     step_text.markdown(f"**✅ Шаг {step_num+1} завершен**")
-                    st.markdown(f"---\n{result}\n---")
+                    st.markdown(f"<pre>{result}</pre>", unsafe_allow_html=True)
                     responses.append(result)
 
                     # Добавляем результат текущего шага в контекст для следующих шагов
@@ -172,7 +172,7 @@ def generate_response():
         # Выводим в интерфейс
         st.divider()
         st.subheader("Результаты по каждому шагу")
-        st.markdown(raw_report)
+        st.markdown(raw_report) 
 
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
