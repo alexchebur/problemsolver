@@ -7,7 +7,6 @@ from io import BytesIO
 from fpdf import FPDF
 import base64
 import os
-from markdown2 import Markdown
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
@@ -34,8 +33,8 @@ if 'report_content' not in st.session_state:
     st.session_state.report_content = None
 
 REASONING_STEPS = [
-    "Первая часть отчета: постановка проблемы и расширение контекста. Проанализируй запрос пользователя {query} и на его основе сформулируей подразумеваемую пользователем проблему. Придумай пять сходных по смыслу концепций-тезисов из смежных запросу пользователя контекстов, используй метод Tree of Thoughts",
-    "Вторая часть отчета: гипотезы о причинах и варианты решения разными методами. Сформулируй наиболее вероятные причины и предпосылки проблемы на основе {context}, сформулируй варианты решения проблемы с применением методов познания из {st.session_state.sys_prompt}",
+    "Первая часть отчета: постановка проблемы и расширение контекста. Проанализируй запрос пользователя {query} и на его основе сформулируй подразумеваемую пользователем проблему. Придумай пять сходных по смыслу концепций-тезисов из смежных запросу пользователя контекстов, используй метод Tree of Thoughts",
+    "Вторая часть отчета: гипотезы о причинах и варианты решения разными методами. Сформулируй наиболее вероятные причины и предпосылки проблемы на основе {context}, сформулируй варианты решения проблемы с применением методов познания из {sys_prompt}",
     "Третья часть отчета: выбор оптимальных решений и выводы. Выбери оптимальные решения на основе {context}, подробно детализируй каждое из оптимальных решений."
 ]
 
@@ -54,55 +53,24 @@ def parse_docx(uploaded_file):
         st.session_state.current_doc_text = ""
         return False
 
-def process_step(step_num, step_name, context, temperature):
-    try:
-        step_text = st.empty()
-        step_text.markdown(f"**🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}: {step_name}**")
-
-        prompt = (
-            f"{step_name}\n"
-            f"Контекст: {context}\n\n"
-            "Ваш ответ должен быть полным, но не должен содержать упоминаний о шагах "
-            "(например, не пишите 'На шаге 1...', 'В рамках первого этапа...')"
-        )
-
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": temperature,
-                "max_output_tokens": 9000
-            },
-            request_options={'timeout': 60}
-        )
-
-        result = response.text
-        step_text.code(f"**✅ Шаг {step_num+1} завершен**")
-        st.text(f"<pre>{result}</pre>", unsafe_allow_html=True)
-        return result
-
-    except Exception as e:
-        error_msg = f"🚨 Ошибка на шаге {step_num+1}: {str(e)}"
-        st.error(error_msg)
-        return error_msg
-
 def create_pdf(content, title="Отчет"):
-    markdowner = Markdown()
-    html_content = markdowner.convert(content)
-    
     pdf = FPDF()
     pdf.add_page()
-    #pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
-    #pdf.set_font('DejaVu', '', 12)
-    pdf.set_font("Arial", size=12)
-    pdf.write_html(html_content)
-    return pdf.output(dest='S')
+    pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+    pdf.set_font('DejaVu', '', 12)
+    
+    # Упрощенное добавление текста
+    for line in content.split('\n'):
+        pdf.cell(0, 10, txt=line, ln=1)
+    
+    return pdf.output(dest='S').encode('latin1')
 
 def generate_response():
     st.session_state.processing = True
     st.session_state.report_content = None
     status_area = st.empty()
     progress_bar = st.progress(0)
-    results_container = st.container()
+    results_container = st.empty()
 
     try:
         query = st.session_state.input_query.strip()
@@ -114,95 +82,97 @@ def generate_response():
             status_area.warning("⚠️ Загрузите документ")
             return
 
-        # Начальный контекст — только системный промпт + документ + запрос
+        # Начальный контекст
         context = (
-            f"{st.session_state.sys_prompt}\n"
-            f"Документ:\n{st.session_state.current_doc_text}\n"
+            f"Системный промпт: {st.session_state.sys_prompt}\n"
+            f"Документ: {st.session_state.current_doc_text[:1000]}...\n"
             f"Запрос: {query}"
         )
 
         responses = []
-        with results_container:
-            for step_num, step_name in enumerate(REASONING_STEPS):
+        full_report = ""
+        
+        with st.spinner("Обработка запроса..."):
+            for step_num, step_template in enumerate(REASONING_STEPS):
                 progress = int((step_num + 1) / len(REASONING_STEPS) * 100)
                 progress_bar.progress(progress)
-
-                # Формируем prompt для текущего шага
-                prompt = (
-                    f"{step_name}\n"
-                    f"Контекст: {context}\n\n"
-                    "Ваш ответ должен быть полным, но не должен содержать упоминаний о шагах "
-                    "(например, не пишите 'На шаге 1...', 'В рамках первого этапа...')"
+                
+                # Формируем промпт для шага
+                step_name = step_template.format(
+                    query=query,
+                    context=context,
+                    sys_prompt=st.session_state.sys_prompt
                 )
-
-                step_text = st.empty()
-                step_text.markdown(f"**🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}: {step_name}**")
-
+                
+                st.markdown(f"**🔹 Шаг {step_num+1}/{len(REASONING_STEPS)}**")
+                
                 try:
                     response = model.generate_content(
-                        prompt,
+                        step_name,
                         generation_config={
                             "temperature": st.session_state.temperature,
                             "max_output_tokens": 9000
                         },
-                        request_options={'timeout': 60}
+                        request_options={'timeout': 120}
                     )
+                    
                     result = response.text
-                    step_text.markdown(f"**✅ Шаг {step_num+1} завершен**")
-                    st.text(f"<pre>{result}</pre>", unsafe_allow_html=True)
                     responses.append(result)
-
-                    # Добавляем результат текущего шага в контекст для следующих шагов
-                    context += f"\n\nРезультат шага {step_num+1} ({step_name}): {result}"
-
+                    
+                    # Добавляем результат в контекст
+                    context += f"\n\nРезультат шага {step_num+1}: {result[:500]}..."
+                    
+                    # Отображаем результат
+                    with st.expander(f"✅ Шаг {step_num+1} завершен", expanded=True):
+                        st.code(result, language='text')
+                    
+                    full_report += f"### Шаг {step_num+1} ###\n\n{result}\n\n{'='*50}\n\n"
+                    
                 except Exception as e:
                     error_msg = f"🚨 Ошибка на шаге {step_num+1}: {str(e)}"
                     st.error(error_msg)
                     responses.append(error_msg)
+                    full_report += f"### Ошибка на шаге {step_num+1} ###\n\n{error_msg}\n\n"
 
                 time.sleep(1)
 
-        # Сохраняем объединенные результаты
-        raw_report = ""
-        for i, response in enumerate(responses):
-            raw_report += f"### Шаг {i + 1}: {REASONING_STEPS[i]}\n\n{response}\n\n"
-
-        st.session_state.report_content = raw_report
-
-        # Выводим в интерфейс
+        st.session_state.report_content = full_report
+        progress_bar.empty()
+        st.success("✅ Обработка завершена!")
+        
+        # Показываем полный отчет
         st.divider()
-        st.subheader("Результаты по каждому шагу")
-        st.text(raw_report) 
+        st.subheader("Полный отчет")
+        st.code(full_report, language='text')
 
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
-        traceback.print_exception(e)
+        traceback.print_exc()
     finally:
         st.session_state.processing = False
-        progress_bar.empty()
 
 # Интерфейс Streamlit
 # --- Боковая панель ---
 with st.sidebar:
-    st.title(f"<pre>" Troubleshooter"</pre>", unsafe_allow_html=True)
-    st.subheader(f"<pre>"Решатель проблем"</pre>", unsafe_allow_html=True)
+    st.title("Troubleshooter")
+    st.subheader("Решатель проблем")
 
-    st.text(f"<pre>"### Системный промпт:"</pre>", unsafe_allow_html=True) 
-    st.text_area(
-        "Системный промпт:",
-        value="Вы - troubleshooter, специалист по решению проблем в различных отраслях знаний и жизнедеятельности. "
-              "Помогайте пользователю исследовать проблему и предлагать пути ее решения. Руководствуйтесь методами First Principles Thinking, "
-              "Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, "
-              "Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, "
-              "Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, "
-              "System 1 vs System 2 Thinking, Antifragility, Теории решения изобретательских задач. Вы будете выполнять несколько шагов анализа. Ответы должны быть согласованы между собой и составлять не менее 5000 символов (НЕ упоминай количество символов). Следующие шаги будут опираться на выводы предыдущих. Числовые ряды и последовательности данных представляйте в формате ASCII-диаграмм. Отвечайте по-русски",
-        height=300,
-        key="sys_prompt"
+    st.markdown("### Системный промпт:")
+    st.session_state.sys_prompt = st.text_area(
+        "",
+        value="Вы - troubleshooter, специалист по решению проблем. "
+              "Помогайте пользователю исследовать проблему и предлагать пути ее решения. "
+              "Руководствуйтесь методами First Principles Thinking, Inversion, Pareto Principle. "
+              "Ответы должны быть согласованы между собой. "
+              "Числовые ряды представляйте в формате ASCII-диаграмм. Отвечайте по-русски.",
+        height=250,
+        label_visibility="collapsed"
     )
 
 # --- Основная область ---
-st.title(f"<pre>" Troubleshooter - Решатель проблем"</pre>", unsafe_allow_html=True)
+st.title("Troubleshooter - Решатель проблем")
 st.subheader("Решение проблем с применением когнитивных методов на основе контекста в документе Word")
+
 col1, col2 = st.columns([3, 1])
 with col1:
     st.text_input(
@@ -217,33 +187,36 @@ with col2:
         key="temperature"
     )
 
-st.file_uploader(
-    "Загрузите DOCX файл с дополнительным контекстом (желательно не более 200 тыс. символов):",
+uploaded_file = st.file_uploader(
+    "Загрузите DOCX файл с дополнительным контекстом:",
     type=["docx"],
-    key="uploaded_file",
-    on_change=lambda: parse_docx(st.session_state.uploaded_file)
+    key="uploaded_file"
 )
 
-if st.session_state.uploaded_file and not st.session_state.current_doc_text:
-    parse_docx(st.session_state.uploaded_file)
+if uploaded_file:
+    parse_docx(uploaded_file)
 
-if st.button("Отправить", disabled=st.session_state.processing):
+if st.button("Сгенерировать отчет", disabled=st.session_state.processing):
     generate_response()
 
-if st.session_state.processing:
-    st.info("Обработка запроса...")
-
-# --- Экспорт PDF ---
-if st.session_state.report_content:
+# --- Экспорт результатов ---
+if st.session_state.report_content and not st.session_state.processing:
     st.divider()
     st.subheader("Экспорт результатов")
+    
+    # Текстовый экспорт
+    b64_txt = base64.b64encode(st.session_state.report_content.encode()).decode()
+    txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT отчет</a>'
+    st.markdown(txt_href, unsafe_allow_html=True)
+    
+    # PDF экспорт (упрощенный)
+    try:
+        pdf_bytes = create_pdf(st.session_state.report_content)
+        b64_pdf = base64.b64encode(pdf_bytes).decode()
+        pdf_href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="report.pdf">📥 Скачать PDF отчет</a>'
+        st.markdown(pdf_href, unsafe_allow_html=True)
+    except Exception as e:
+        st.warning(f"Не удалось создать PDF: {str(e)}")
 
-    # Создаем PDF
-    pdf_bytes = create_pdf(st.session_state.report_content)
-
-    if pdf_bytes:
-        # Формируем кнопку скачивания
-        b64 = base64.b64encode(pdf_bytes).decode()
-        filename = f"gemini_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
-        href = f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">📥 Скачать PDF отчет</a>'
-        st.text(href, unsafe_allow_html=True)
+if st.session_state.processing:
+    st.info("⏳ Обработка запроса...")
