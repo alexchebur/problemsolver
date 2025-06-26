@@ -56,7 +56,7 @@ def parse_docx(uploaded_file):
 def create_pdf(content, title="Отчет"):
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+    pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
     pdf.set_font('DejaVu', '', 12)
     
     # Упрощенное добавление текста
