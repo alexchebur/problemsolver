@@ -162,8 +162,8 @@ with st.sidebar:
         "",
         value="Вы - troubleshooter, специалист по решению проблем. "
               "Помогайте пользователю исследовать проблему и предлагать пути ее решения. "
-              "Руководствуйтесь методами First Principles Thinking, Inversion, Pareto Principle. "
-              "Ответы должны быть согласованы между собой. "
+              "Руководствуйтесь методами First Principles Thinking, Inversion (thinking backwards), Opportunity Cost, Second-Order Thinking, Margin of Diminishing Returns, Occam’s Razor, Hanlon’s Razor, Confirmation Bias, Availability Heuristic, Parkinson’s Law, Loss Aversion, Switching Costs, Circle of Competence, Regret Minimization, Leverage Points, Pareto Principle (80/20 Rule), Lindy Effect, Game Theory, System 1 vs System 2 Thinking, Antifragility, Теории Решения Изобретательских задач. "
+              "Ответы должны быть согласованы между собой, составлять не менее 5000 символов (БЕЗ указания количества символов в ответе). "
               "Числовые ряды представляйте в формате ASCII-диаграмм. Отвечайте по-русски.",
         height=250,
         label_visibility="collapsed"
