@@ -229,7 +229,7 @@ def generate_response():
                         step_name,
                         generation_config={
                             "temperature": st.session_state.temperature,
-                            "max_output_tokens": 9000
+                            "max_output_tokens": 10000
                         },
                         request_options={'timeout': 120}
                     )
@@ -238,7 +238,7 @@ def generate_response():
                     responses.append(result)
                     
                     # Добавляем результат в контекст
-                    context += f"\n\nРезультат шага {step_num+1}: {result[:500]}..."
+                    context += f"\n\nРезультат шага {step_num+1}: {result[:9000]}..."
                     
                     # Отображаем результат
                     with st.expander(f"✅ Шаг {step_num+1} завершен", expanded=True):
