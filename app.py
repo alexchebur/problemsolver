@@ -96,20 +96,43 @@ def create_pdf(content, title="Отчет"):
         pdf.add_font('DejaVu', '', font_path, uni=True)
         pdf.set_font('DejaVu', '', 12)
         
-        # Добавляем текст
-        for line in content.split('\n'):
-            # Поддержка кириллицы
-            try:
-                pdf.cell(0, 10, txt=line, ln=1)
-            except UnicodeEncodeError:
-                # Если есть проблемы с кодировкой, преобразуем в latin1
-                safe_line = line.encode('latin1', 'replace').decode('latin1')
-                pdf.cell(0, 10, txt=safe_line, ln=1)
+        # Устанавливаем эффективную ширину текста (190 мм - ширина A4 минус поля)
+        effective_width = 190
         
-        # Используем BytesIO для получения байтов
+        # Разбиваем контент на строки
+        lines = content.split('\n')
+        
+        for line in lines:
+            # Пропускаем пустые строки
+            if not line.strip():
+                pdf.ln(6)  # Добавляем небольшой отступ
+                continue
+                
+            # Разбиваем длинные строки на несколько частей
+            while line:
+                # Находим максимальную подстроку, которая помещается в ширину
+                if pdf.get_string_width(line) <= effective_width:
+                    pdf.cell(0, 10, txt=line, ln=1)
+                    break
+                
+                # Находим позицию для разбиения строки
+                split_position = 0
+                for i in range(len(line), 0, -1):
+                    if pdf.get_string_width(line[:i]) <= effective_width:
+                        split_position = i
+                        break
+                
+                # Если не нашли место для разбиения, используем всю строку
+                if split_position == 0:
+                    split_position = len(line)
+                
+                # Выводим часть строки и продолжаем с остатком
+                pdf.cell(0, 10, txt=line[:split_position], ln=1)
+                line = line[split_position:].lstrip()
+        
         buffer = BytesIO()
         pdf.output(buffer)
-        return buffer.getvalue()  # Возвращаем байты напрямую
+        return buffer.getvalue()
     
     except Exception as e:
         st.error(f"🚨 Ошибка при создании PDF: {str(e)}")
