@@ -137,36 +137,34 @@ def create_pdf(content, title="Отчет"):
         # Устанавливаем эффективную ширину текста (190 мм - ширина A4 минус поля)
         effective_width = 190
         
-        # Разбиваем контент на строки
-        lines = content.split('\n')
+        # Разбиваем контент на абзацы
+        paragraphs = content.split('\n')
         
-        for line in lines:
-            # Пропускаем пустые строки
-            if not line.strip():
-                pdf.ln(6)  # Добавляем небольшой отступ
+        for para in paragraphs:
+            if not para.strip():
+                pdf.ln(6)  # Добавляем отступ для пустых строк
                 continue
                 
-            # Разбиваем длинные строки на несколько частей
-            while line:
-                # Находим максимальную подстроку, которая помещается в ширину
-                if pdf.get_string_width(line) <= effective_width:
-                    pdf.cell(0, 10, txt=line, ln=1)
-                    break
-                
-                # Находим позицию для разбиения строки
-                split_position = 0
-                for i in range(len(line), 0, -1):
-                    if pdf.get_string_width(line[:i]) <= effective_width:
-                        split_position = i
-                        break
-                
-                # Если не нашли место для разбиения, используем всю строку
-                if split_position == 0:
-                    split_position = len(line)
-                
-                # Выводим часть строки и продолжаем с остатком
-                pdf.cell(0, 10, txt=line[:split_position], ln=1)
-                line = line[split_position:].lstrip()
+            # Разбиваем абзац на слова
+            words = para.split()
+            current_line = ""
+            
+            for word in words:
+                # Проверяем, помещается ли слово в текущую строку
+                test_line = current_line + " " + word if current_line else word
+                if pdf.get_string_width(test_line) <= effective_width:
+                    current_line = test_line
+                else:
+                    # Выводим текущую строку
+                    pdf.cell(0, 10, txt=current_line, ln=1)
+                    current_line = word
+            
+            # Выводим оставшиеся слова в абзаце
+            if current_line:
+                pdf.cell(0, 10, txt=current_line, ln=1)
+            
+            # Добавляем отступ между абзацами
+            pdf.ln(4)
         
         buffer = BytesIO()
         pdf.output(buffer)
@@ -324,7 +322,7 @@ if st.session_state.report_content and not st.session_state.processing:
     
     # Текстовый экспорт
     b64_txt = base64.b64encode(st.session_state.report_content.encode()).decode()
-    txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT отчет</a>'
+    txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT отчет (MarkDown)</a>'
     st.markdown(txt_href, unsafe_allow_html=True)
     
     # PDF экспорт (упрощенный)
