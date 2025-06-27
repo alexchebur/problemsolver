@@ -7,6 +7,7 @@ from io import BytesIO
 from fpdf import FPDF
 import base64
 import os
+from duckduckgo_search import DDGS  # Добавлен импорт для поиска
 
 # Настройка API
 api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
@@ -38,6 +39,31 @@ REASONING_STEPS = [
     "Третья часть отчета: выбор оптимальных решений и выводы. Выбери оптимальные решения на основе {context}, подробно детализируй каждое из оптимальных решений."
 ]
 
+def duckduckgo_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
+    """Выполняет расширенный поиск в DuckDuckGo с увеличенными лимитами"""
+    try:
+        with DDGS() as ddgs:
+            results = []
+            for r in ddgs.text(
+                query,
+                region=region,
+                max_results=max_results,
+                backend="lite"  # Используем "lite" для получения полных описаний
+            ):
+                # Обрезаем слишком длинные фрагменты
+                if len(r['body']) > max_snippet_length:
+                    r['body'] = r['body'][:max_snippet_length] + "..."
+                results.append(r)
+
+            # Форматируем результаты
+            formatted = []
+            for i, r in enumerate(results, 1):
+                formatted.append(f"Результат {i}: {r['title']}\n{r['body']}\nURL: {r['href']}\n")
+
+            return "\n\n".join(formatted)
+    except Exception as e:
+        return f"Ошибка поиска: {str(e)}"
+
 def parse_docx(uploaded_file):
     try:
         if uploaded_file is None:
@@ -45,7 +71,7 @@ def parse_docx(uploaded_file):
 
         doc = Document(BytesIO(uploaded_file.getvalue()))
         full_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-        st.session_state.current_doc_text = full_text[:400000]
+        st.session_state.current_doc_text = full_text[:300000]
         st.success(f"📂 Документ загружен: {len(st.session_state.current_doc_text)} символов")
         return True
     except Exception as e:
@@ -106,11 +132,17 @@ def generate_response():
             status_area.warning("⚠️ Загрузите документ")
             return
 
-        # Начальный контекст
+        # Выполняем поиск в DuckDuckGo
+        status_area.info("🔍 Выполняю поиск в интернете...")
+        search_results = duckduckgo_search(query)
+        status_area.success("✅ Поиск завершен!")
+
+        # Формируем контекст с результатами поиска
         context = (
             f"Системный промпт: {st.session_state.sys_prompt}\n"
-            f"Документ: {st.session_state.current_doc_text[:1000]}...\n"
-            f"Запрос: {query}"
+            f"Документ: {st.session_state.current_doc_text[:300000]}...\n"
+            f"Запрос: {query}\n"
+            f"Результаты веб-поиска:\n{search_results}"
         )
 
         responses = []
