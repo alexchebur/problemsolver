@@ -11,7 +11,7 @@ from duckduckgo_search import DDGS  # Добавлен импорт для по�
 
 # Настройка API
 api_key = os.environ['GEMINI_API_KEY'].
-api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
+#api_key = "AIzaSyCGC2JB3BgfBMycbt4us1eq6D5exNOvKT8"
 if not api_key:
     st.warning("Пожалуйста, введите API-ключ")
     st.stop()
