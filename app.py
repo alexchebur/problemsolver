@@ -39,30 +39,68 @@ REASONING_STEPS = [
     "Третья часть отчета: выбор оптимальных решений и выводы. Выбери оптимальные решения на основе {context}, подробно детализируй каждое из оптимальных решений."
 ]
 
-def duckduckgo_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
-    """Выполняет расширенный поиск в DuckDuckGo с увеличенными лимитами"""
+#def duckduckgo_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
+#    """Выполняет расширенный поиск в DuckDuckGo с увеличенными лимитами"""
+#    try:
+#        with DDGS() as ddgs:
+#            results = []
+#            for r in ddgs.text(
+#                query,
+#                region=region,
+#                max_results=max_results,
+#                backend="lite"  # Используем "lite" для получения полных описаний
+#            ):
+#                # Обрезаем слишком длинные фрагменты
+#                if len(r['body']) > max_snippet_length:
+#                    r['body'] = r['body'][:max_snippet_length] + "..."
+#                results.append(r)
+
+#            # Форматируем результаты
+#            formatted = []
+#            for i, r in enumerate(results, 1):
+#                formatted.append(f"Результат {i}: {r['title']}\n{r['body']}\nURL: {r['href']}\n")
+
+#            return "\n\n".join(formatted)
+#    except Exception as e:
+#        return f"Ошибка поиска: {str(e)}"
+
+def perform_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
+    """Выполняет поиск и отображает результаты в сайдбаре"""
     try:
         with DDGS() as ddgs:
             results = []
+            st.sidebar.subheader("Результаты поиска")
+            
             for r in ddgs.text(
                 query,
                 region=region,
                 max_results=max_results,
-                backend="lite"  # Используем "lite" для получения полных описаний
+                backend="lite"
             ):
                 # Обрезаем слишком длинные фрагменты
-                if len(r['body']) > max_snippet_length:
-                    r['body'] = r['body'][:max_snippet_length] + "..."
+                snippet = r['body'][:500] + "..." if len(r['body']) > 500 else r['body']
                 results.append(r)
+                
+                # Выводим в сайдбар
+                with st.sidebar.expander(f"🔍 {r['title']}"):
+                    st.write(snippet)
+                    st.caption(f"URL: {r['href']}")
 
-            # Форматируем результаты
+            # Форматируем результаты для контекста
             formatted = []
             for i, r in enumerate(results, 1):
-                formatted.append(f"Результат {i}: {r['title']}\n{r['body']}\nURL: {r['href']}\n")
-
+                body = r['body'][:max_snippet_length] + "..." if len(r['body']) > max_snippet_length else r['body']
+                formatted.append(f"Результат {i}: {r['title']}\n{body}\nURL: {r['href']}\n")
+            
             return "\n\n".join(formatted)
     except Exception as e:
+        st.sidebar.error(f"Ошибка поиска: {str(e)}")
         return f"Ошибка поиска: {str(e)}"
+
+
+
+
+
 
 def parse_docx(uploaded_file):
     try:
@@ -157,7 +195,8 @@ def generate_response():
 
         # Выполняем поиск в DuckDuckGo
         status_area.info("🔍 Выполняю поиск в интернете...")
-        search_results = duckduckgo_search(query)
+        #search_results = duckduckgo_search(query)
+        search_results = perform_search(query)
         status_area.success("✅ Поиск завершен!")
 
         # Формируем контекст с результатами поиска
