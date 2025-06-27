@@ -54,16 +54,40 @@ def parse_docx(uploaded_file):
         return False
 
 def create_pdf(content, title="Отчет"):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
-    pdf.set_font('DejaVu', '', 12)
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Указываем путь к шрифту
+        font_path = "fonts/DejaVuSansCondensed.ttf"
+        
+        # Проверяем существование файла шрифта
+        if not os.path.exists(font_path):
+            st.error(f"🚫 Файл шрифта не найден: {font_path}")
+            return None
+        
+        # Добавляем шрифт
+        pdf.add_font('DejaVu', '', font_path, uni=True)
+        pdf.set_font('DejaVu', '', 12)
+        
+        # Добавляем текст
+        for line in content.split('\n'):
+            # Поддержка кириллицы
+            try:
+                pdf.cell(0, 10, txt=line, ln=1)
+            except UnicodeEncodeError:
+                # Если есть проблемы с кодировкой, преобразуем в latin1
+                safe_line = line.encode('latin1', 'replace').decode('latin1')
+                pdf.cell(0, 10, txt=safe_line, ln=1)
+        
+        # Используем BytesIO для получения байтов
+        buffer = BytesIO()
+        pdf.output(buffer)
+        return buffer.getvalue()  # Возвращаем байты напрямую
     
-    # Упрощенное добавление текста
-    for line in content.split('\n'):
-        pdf.cell(0, 10, txt=line, ln=1)
-    
-    return pdf.output(dest='S').encode('latin1')
+    except Exception as e:
+        st.error(f"🚨 Ошибка при создании PDF: {str(e)}")
+        return None
 
 def generate_response():
     st.session_state.processing = True
