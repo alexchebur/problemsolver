@@ -43,7 +43,7 @@ class WebSearcher:
             logger.info(f"Выполняю поиск: {query}")
             time.sleep(random.uniform(*self.delay_range))  # ✅ Случайная задержка
 
-            results = self.ddgs.text(query, max_results=max_results, backend="api")
+            results = self.ddgs.text(query, max_results=max_results, backend="auto")
 
             if not results:
                 logger.warning(f"Нет результатов для: {query}")
