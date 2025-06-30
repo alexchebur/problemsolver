@@ -331,11 +331,15 @@ def generate_response():
         
         for i, search_query in enumerate(queries):
             try:
+                clean_query = search_query.replace('"', '').strip()
+                search_result_list = searcher.perform_search(clean_query, max_results=3)
                 # Используем созданный экземпляр WebSearcher
-                search_result_list = searcher.perform_search(
-                    search_query,
-                    max_results=3
-                )
+                #search_result_list = searcher.perform_search(
+                    #search_query,
+                    #max_results=3
+                #)
+            
+            
                 
                 # Форматируем результаты
                 formatted_results = []
