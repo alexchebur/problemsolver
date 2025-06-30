@@ -351,15 +351,18 @@ def generate_response():
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
         
-
-    
-    # Этап 2: Поиск информации
-    
-    for i, search_query in enumerate(queries):
-        # Используем новую функцию поиска
-        search_result = perform_search(search_query, max_results=3)
-        all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
-        time.sleep(1.5)  # Задержка между запросами
+        # Этап 2: Поиск информации
+        status_area.info("🔍 Выполняю поиск информации...")
+        all_search_results = ""
+        
+        for i, search_query in enumerate(queries):
+            try:
+                search_result = perform_search(search_query, max_results=5)
+                all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
+                time.sleep(1.5)  # Задержка между запросами
+            except Exception as e:
+                st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
+                all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"
         
         st.session_state.search_results = all_search_results
         
@@ -393,26 +396,33 @@ def generate_response():
             progress_bar.progress(progress)
             
             status_area.info(f"⚙️ Применяю {method}...")
-            result = apply_cognitive_method(method, context)
-            
-            method_results[method] = result
-            
-            with st.expander(f"✅ {method}", expanded=False):
-                st.code(result, language='text')
-            
-            full_report += f"### Методика: {method} ###\n\n{result}\n\n"
+            try:
+                result = apply_cognitive_method(method, context)
+                method_results[method] = result
+                
+                with st.expander(f"✅ {method}", expanded=False):
+                    st.code(result, language='text')
+                
+                full_report += f"### Методика: {method} ###\n\n{result}\n\n"
+            except Exception as e:
+                st.error(f"Ошибка при применении {method}: {str(e)}")
+                full_report += f"### Ошибка при применении {method}: {str(e)}\n\n"
             
             time.sleep(1)
         
         # Этап 4: Итоговые выводы
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
-        conclusions = generate_final_conclusions(full_report)
-        
-        with st.expander("📝 Итоговые выводы", expanded=True):
-            st.write(conclusions)
-        
-        full_report += f"### Итоговые выводы ###\n\n{conclusions}\n\n"
+        try:
+            conclusions = generate_final_conclusions(full_report)
+            
+            with st.expander("📝 Итоговые выводы", expanded=True):
+                st.write(conclusions)
+            
+            full_report += f"### Итоговые выводы ###\n\n{conclusions}\n\n"
+        except Exception as e:
+            st.error(f"Ошибка при генерации выводов: {str(e)}")
+            full_report += f"### Ошибка при генерации выводов: {str(e)}\n\n"
         
         # Сохраняем полный отчет
         st.session_state.report_content = full_report
@@ -422,7 +432,7 @@ def generate_response():
         # Показываем полный отчет
         st.divider()
         st.subheader("Полный отчет")
-        st.text(full_report[:20000] + ("..." if len(full_report) > 20000 else ""))
+        st.text(full_report[:30000] + ("..." if len(full_report) > 30000 else ""))
 
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
