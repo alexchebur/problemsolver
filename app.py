@@ -10,7 +10,6 @@ import base64
 import os
 from datetime import datetime
 from websearch import WebSearcher  # Измененный импорт
-
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
 if not api_key:
