@@ -353,10 +353,19 @@ def generate_response():
                 # Показываем результаты в сайдбаре
                 st.sidebar.subheader(f"Результаты по запросу: '{search_query}'")
                 for j, r in enumerate(search_result_list, 1):
-                    with st.sidebar.expander(f"🔍 {r.get('title', 'Без названия')}"):
-                        snippet = r.get('body', '')[:500] + "..." if len(r.get('body', '')) > 500 else r.get('body', '')
-                        st.write(snippet)
-                        st.caption(f"URL: {r.get('href', '')}")
+                    title = r.get('title', 'Без названия')
+                    url = r.get('url', '')
+                    snippet = r.get('snippet', '')
+    
+               # Проверка и форматирование URL
+                    if url and not url.startswith('http'):
+                        url = 'https://' + url
+    
+                    st.sidebar.subheader(f"🔍 {title}")
+                    if url:
+                        st.sidebar.markdown(f"[{url}]({url})")
+                    if snippet:
+                        st.sidebar.write(snippet[:300] + ('...' if len(snippet) > 300 else ''))
                 
             except Exception as e:
                 st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
@@ -366,6 +375,11 @@ def generate_response():
         
         with st.expander("🔍 Результаты поиска", expanded=False):
             st.text(all_search_results[:10000] + ("..." if len(all_search_results) > 10000 else ""))
+
+
+
+
+
         
         full_report += f"### Результаты поиска ###\n\n{all_search_results}\n\n"
         
