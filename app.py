@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import time
+import requests
 import traceback
 import random
 from docx import Document
