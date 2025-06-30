@@ -53,7 +53,7 @@ class WebSearcher:
             logger.info(f"Выполняю поиск: {query}")
             
             # Пробуем разные бэкенды последовательно
-            backends = ["api", "html", "lite"]
+            backends = ["auto", "api", "html", "lite"]
             results = []
             
             for backend in backends:
