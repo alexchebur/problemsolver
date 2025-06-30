@@ -8,9 +8,8 @@ from io import BytesIO
 from fpdf import FPDF
 import base64
 import os
-#from duckduckgo_search import DDGS - удалили из-за выделения вебпоиска в отдельный скрипт
 from datetime import datetime
-from websearch import perform_search  # Новый импорт
+from websearch import WebSearcher  # Измененный импорт
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
@@ -25,6 +24,9 @@ genai.configure(
         'api_endpoint': 'generativelanguage.googleapis.com/'
     }
 )
+
+# Создаем экземпляр поисковика
+searcher = WebSearcher()  # ✅ Единый экземпляр для всего приложения
 
 # Глобальные переменные состояния
 if 'current_doc_text' not in st.session_state:
@@ -73,36 +75,6 @@ ADDITIONAL_METHODS = [
 
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
-
-#def perform_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
-#    """Выполняет поиск и отображает результаты в сайдбаре"""
-#    try:
-#        with DDGS() as ddgs:
-#            results = []
-#            st.sidebar.subheader("Результаты поиска")
-            
-#            for r in ddgs.text(
-#                query,
-#                region=region,
-#                max_results=max_results,
-#                backend="lite"
-#            ):
-#                snippet = r['body'][:500] + "..." if len(r['body']) > 500 else r['body']
-#                results.append(r)
-                
-#                with st.sidebar.expander(f"🔍 {r['title']}"):
-#                    st.write(snippet)
-#                    st.caption(f"URL: {r['href']}")
-
-#            formatted = []
-#            for i, r in enumerate(results, 1):
-#                body = r['body'][:max_snippet_length] + "..." if len(r['body']) > max_snippet_length else r['body']
-#                formatted.append(f"Результат {i}: {r['title']}\n{body}\nURL: {r['href']}\n")
-            
-#            return "\n\n".join(formatted)
-#    except Exception as e:
-#        st.sidebar.error(f"Ошибка поиска: {str(e)}")
-#        return f"Ошибка поиска: {str(e)}"
 
 def parse_docx(uploaded_file):
     try:
@@ -358,14 +330,29 @@ def generate_response():
         
         for i, search_query in enumerate(queries):
             try:
-                # Уменьшаем количество результатов и увеличиваем задержку
-                search_result = perform_search(
+                # Используем созданный экземпляр WebSearcher
+                search_result_list = searcher.perform_search(
                     search_query,
-                    max_results=3,
-                    max_snippet_length=800
+                    max_results=3
                 )
-                all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
-                time.sleep(random.uniform(2.0, 5.0))  # Случайная задержка между запросами
+                
+                # Форматируем результаты
+                formatted_results = []
+                for j, r in enumerate(search_result_list, 1):
+                    body = r.get('body', '')[:800] + "..." if len(r.get('body', '')) > 800 else r.get('body', '')
+                    formatted_results.append(f"Результат {j}: {r.get('title', '')}\n{body}\nURL: {r.get('href', '')}\n")
+                
+                search_result_str = "\n\n".join(formatted_results)
+                all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
+                
+                # Показываем результаты в сайдбаре
+                st.sidebar.subheader(f"Результаты по запросу: '{search_query}'")
+                for j, r in enumerate(search_result_list, 1):
+                    with st.sidebar.expander(f"🔍 {r.get('title', 'Без названия')}"):
+                        snippet = r.get('body', '')[:500] + "..." if len(r.get('body', '')) > 500 else r.get('body', '')
+                        st.write(snippet)
+                        st.caption(f"URL: {r.get('href', '')}")
+                
             except Exception as e:
                 st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
                 all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"
