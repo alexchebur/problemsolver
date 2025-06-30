@@ -23,7 +23,7 @@ def get_random_user_agent():
 def safe_request(url, headers, params=None):
     return requests.get(url, headers=headers, params=params, timeout=15)
 
-def duckduckgo_html_search(query, region='ru-ru', max_results=5):
+def duckduckgo_html_search(query, region='ru-ru', max_results=1):
     try:
         headers = {'User-Agent': get_random_user_agent()}
         params = {'q': query, 'kl': region}
@@ -34,7 +34,7 @@ def duckduckgo_html_search(query, region='ru-ru', max_results=5):
     except Exception as e:
         return f"Ошибка DuckDuckGo: {str(e)}"
 
-def mojeek_search(query, max_results=5):
+def mojeek_search(query, max_results=1):
     try:
         headers = {'User-Agent': get_random_user_agent()}
         params = {'q': query, 's': max_results}
@@ -45,7 +45,7 @@ def mojeek_search(query, max_results=5):
     except Exception as e:
         return f"Ошибка Mojeek: {str(e)}"
 
-def perform_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
+def perform_search(query, region='ru-ru', max_results=1, max_snippet_length=3000):
     try:
         headers = {'User-Agent': get_random_user_agent()}
         with DDGS(headers=headers) as ddgs:  # Укажите заголовки
