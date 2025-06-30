@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict
 import re
+import streamlit as st
 
 if st.secrets.get("network", {}).get("enableProxy", False):
     os.environ["HTTP_PROXY"] = "http://proxy.streamlit.io:3128"
