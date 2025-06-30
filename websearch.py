@@ -3,6 +3,7 @@ import logging
 import requests
 from typing import List, Dict
 import random
+from bs4 import BeautifulSoup
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +39,7 @@ class GoogleCSESearcher:
             response.raise_for_status()
         
             # Упрощенный парсинг основного контента
-            from bs4 import BeautifulSoup
+            #from bs4 import BeautifulSoup
             soup = BeautifulSoup(response.text, 'html.parser')
         
             # Удаляем ненужные элементы
