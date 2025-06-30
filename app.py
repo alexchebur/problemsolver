@@ -18,11 +18,6 @@ if not api_key:
     st.warning("Пожалуйста, введите API-ключ")
     st.stop()
 
-if st.secrets.get("network", {}).get("enableProxy", False):
-    os.environ["HTTP_PROXY"] = "http://proxy.streamlit.io:3128"
-    os.environ["HTTPS_PROXY"] = "http://proxy.streamlit.io:3128"
-
-
 
 genai.configure(
     api_key=api_key,
