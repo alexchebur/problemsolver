@@ -6,6 +6,7 @@ from duckduckgo_search import DDGS
 import requests
 from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_fixed
+from googlesearch import search
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +18,27 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
     "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0"
 ]
+
+
+
+class GoogleSearcher:
+    def perform_search(self, query: str, max_results: int = 5) -> List[Dict]:
+        try:
+            results = []
+            for url in search(query, num_results=max_results, lang="ru"):
+                results.append({
+                    'title': '',
+                    'url': url,
+                    'snippet': ''
+                })
+            return results
+        except Exception as e:
+            return [{"error": str(e)}]
+
+# В app.py замените:
+# searcher = WebSearcher()
+searcher = GoogleSearcher()
+
 
 class WebSearcher:
     def __init__(self, max_retries=3, delay_range=(3.0, 6.0)):
