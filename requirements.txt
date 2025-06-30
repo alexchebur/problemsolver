@@ -4,3 +4,4 @@
    fpdf2
    markdown2
    duckduckgo_search
+   fake-useragent
