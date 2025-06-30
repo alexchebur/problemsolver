@@ -18,45 +18,60 @@ USER_AGENTS = [
 ]
 
 class WebSearcher:
-    def __init__(self, max_retries=5, delay_range=(5.0, 15.0)):
+    def __init__(self, max_retries=3, delay_range=(8.0, 15.0)):
         self.max_retries = max_retries
         self.delay_range = delay_range
         self.ddgs = None
         self._init_ddgs()
         
     def _init_ddgs(self):
-        """Инициализация или переинициализация экземпляра DDGS"""
+        """Инициализация экземпляра DDGS с новым User-Agent"""
         user_agent = random.choice(USER_AGENTS)
         try:
             self.ddgs = DDGS(
                 headers={'User-Agent': user_agent},
-                timeout=30  # Увеличенный таймаут
+                timeout=25  # Увеличенный таймаут
             )
             logger.info(f"Инициализирован DDGS с User-Agent: {user_agent[:50]}...")
         except Exception as e:
             logger.error(f"Ошибка инициализации DDGS: {str(e)}")
             self.ddgs = None
 
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1.5, min=4, max=60),
-        retry=retry_if_exception_type((DuckDuckGoSearchException, ConnectionError, TimeoutError)),
-        reraise=False
-    )
     def perform_search(self, query: str, max_results: int = 5) -> List[Dict]:
+        """Основной метод поиска с обработкой ошибок"""
         try:
+            return self._perform_search_retry(query, max_results)
+        except RetryError as e:
+            logger.error(f"Все попытки поиска провалились для '{query}': {str(e)}")
+            return [{
+                "error": "Поиск не удался после всех попыток",
+                "message": "Попробуйте позже или измените запрос"
+            }]
+        except Exception as e:
+            logger.exception(f"Необработанная ошибка для '{query}': {str(e)}")
+            return [{
+                "error": "Критическая ошибка поиска",
+                "details": str(e)
+            }]
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1.5, min=4, max=30),
+        retry=retry_if_exception_type((DuckDuckGoSearchException, ConnectionError, TimeoutError)),
+        reraise=True
+    )
+    def _perform_search_retry(self, query: str, max_results: int = 5) -> List[Dict]:
+        """Внутренний метод с повторными попытками"""
+        if not self.ddgs:
+            self._init_ddgs()
             if not self.ddgs:
-                self._init_ddgs()
-                if not self.ddgs:
-                    raise DuckDuckGoSearchException("Не удалось инициализировать DDGS")
-            
-            logger.info(f"Выполняю поиск: {query}")
-            
-            # Пробуем разные бэкенды последовательно
-            backends = ["auto", "api", "html", "lite"]
-            results = []
-            
-            for backend in backends:
+                raise DuckDuckGoSearchException("Не удалось инициализировать DDGS")
+        
+        logger.info(f"Выполняю поиск: {query}")
+        
+        try:
+            # Пробуем разные бэкенды
+            for backend in ["auto", "api", "html", "lite"]:
                 try:
                     results = self.ddgs.text(
                         keywords=query, 
@@ -65,42 +80,38 @@ class WebSearcher:
                     )
                     if results:
                         logger.info(f"Успешный поиск через {backend} бэкенд")
-                        break
-                except Exception as e:
+                        return self._format_results(results)
+                except DuckDuckGoSearchException as e:
                     logger.warning(f"Бэкенд {backend} не сработал: {str(e)}")
-                    time.sleep(random.uniform(2, 5))
+                    time.sleep(random.uniform(2, 4))
+                    continue
             
-            if not results:
-                logger.warning(f"Нет результатов для: {query}")
-                return []
+            # Если все бэкенды не дали результатов
+            logger.warning(f"Нет результатов для: {query}")
+            return []
             
-            # Форматируем результаты
-            formatted_results = []
-            for r in results:
-                # Проверяем наличие минимально необходимых данных
-                if r.get('title') and r.get('href'):
-                    formatted_results.append({
-                        'title': r.get('title', ''),
-                        'url': r.get('href', ''),
-                        'snippet': r.get('body', '')[:300]  # Ограничение длины сниппета
-                    })
-            
-            return formatted_results
-
-        except DuckDuckGoSearchException as e:
-            logger.error(f"DuckDuckGoSearchException: {str(e)}")
-            self._init_ddgs()  # Переинициализация при специфической ошибке
-            raise
         except Exception as e:
-            logger.error(f"Общая ошибка при поиске: {str(e)}")
+            logger.error(f"Ошибка поиска: {str(e)}")
+            self._init_ddgs()  # Переинициализация после ошибки
             raise
-        finally:
-            # Задержка между запросами
-            delay = random.uniform(*self.delay_range)
-            logger.info(f"Задержка {delay:.2f} сек")
-            time.sleep(delay)
+
+    def _format_results(self, results: List[Dict]) -> List[Dict]:
+        """Форматирование результатов поиска"""
+        formatted = []
+        for r in results:
+            # Проверяем минимальные требования к результату
+            if not r.get('href') or not r.get('title'):
+                continue
+                
+            formatted.append({
+                'title': r.get('title', 'Без названия'),
+                'url': r.get('href', ''),
+                'snippet': r.get('body', 'Описание недоступно')[:500] + '...' if r.get('body') else 'Описание недоступно'
+            })
+        return formatted
 
     def batch_search(self, queries: List[str], max_results: int = 5) -> Dict[str, List[Dict]]:
+        """Пакетный поиск с задержками между запросами"""
         results = {}
         for i, query in enumerate(queries):
             try:
@@ -111,7 +122,11 @@ class WebSearcher:
                     "error": str(e),
                     "message": "Не удалось получить результаты поиска"
                 }]
+            
+            # Задержка между запросами (кроме последнего)
+            if i < len(queries) - 1:
+                delay = random.uniform(*self.delay_range)
+                logger.info(f"Задержка {delay:.2f} сек перед следующим запросом")
+                time.sleep(delay)
                 
-                # Дополнительная задержка после ошибки
-                time.sleep(random.uniform(10, 20))
         return results
