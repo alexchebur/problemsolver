@@ -360,11 +360,12 @@ def generate_response():
             search_result = perform_search(
                 search_query,
                 region='ru-ru',
-                max_results=5,  # Можно уменьшить для ускорения
-                retries=5,      # Увеличим количество попыток
-                delay=1         # Базовая задержка
+                max_results=5,  # Уменьшенное количество результатов
+                retries=3,       # Количество попыток
+                delay=1.5        # Базовая задержка
             )
             all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
+            time.sleep(1)  # Задержка между запросами
         
         st.session_state.search_results = all_search_results
         
