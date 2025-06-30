@@ -176,15 +176,15 @@ def formulate_problem_and_queries():
     
     Ваши задачи:
     1. Сформулируйте ключевую проблему
-    2. Проведите рассуждения, внутренний диалог (вопросы, возражения, сомнения самому себе и ответы)
-    3. Создайте список из 5 поисковых запросов для сбора информации
+    2. Проведите рассуждения (внутренний диалог: вопросы, возражения, сомнения самому себе и ответы)
+    3. Создайте на основе рассуждений список из 5 поисковых запросов для сбора информации
     4. Примените First Principles Thinking и System 2 Thinking
     
     Требования:
     - Вывод структурировать: 
         ПРОБЛЕМА: ... 
-        ВНУТРЕННИЙ ДИАЛОГ: ...
-        ЗАПРОСЫ:
+        РАССУЖДЕНИЯ: ...
+        ЗАПРОСЫ НА ОСНОВЕ РАССУЖДЕНИЙ:
         1. ...
         2. ...
         ...
@@ -211,9 +211,9 @@ def formulate_problem_and_queries():
         # Пытаемся распарсить структурированный ответ
         if "ПРОБЛЕМА:" in result:
             problem_part = result.split("ПРОБЛЕМА:")[1]
-            if "ВНУТРЕННИЙ ДИАЛОГ:" in problem_part:
-                problem = problem_part.split("ВНУТРЕННИЙ ДИАЛОГ:")[0].strip()
-                internal_dialog_part = problem_part.split("ВНУТРЕННИЙ ДИАЛОГ:")[1]
+            if "РАССУЖДЕНИЯ:" in problem_part:
+                problem = problem_part.split("РАССУЖДЕНИЯ:")[0].strip()
+                internal_dialog_part = problem_part.split("РАССУЖДЕНИЯ:")[1]
                 if "ЗАПРОСЫ:" in internal_dialog_part:
                     internal_dialog = internal_dialog_part.split("ЗАПРОСЫ:")[0].strip()
                     queries_part = internal_dialog_part.split("ЗАПРОСЫ:")[1]
@@ -336,7 +336,7 @@ def generate_response():
             st.subheader("Сформулированная проблема")
             st.write(st.session_state.problem_formulation)
             if hasattr(st.session_state, 'internal_dialog'):
-                st.subheader("Внутренний диалог")
+                st.subheader("Рассуждения")
                 st.write(st.session_state.internal_dialog)
             st.subheader("Сгенерированные поисковые запросы")
             st.write(queries)
@@ -347,7 +347,7 @@ def generate_response():
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
         if hasattr(st.session_state, 'internal_dialog'):
-            full_report += f"Внутренний диалог:\n{st.session_state.internal_dialog}\n\n"
+            full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
         
         # Этап 2: Поиск информации
