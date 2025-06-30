@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import time
 import traceback
+import random
 from docx import Document
 from io import BytesIO
 from fpdf import FPDF
