@@ -351,33 +351,24 @@ def generate_response():
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
 
-
-    
-    # Этап 2: Поиск информации
-    status_area.info("🔍 Выполняю поиск информации...")
-    all_search_results = ""
-    
-    for i, search_query in enumerate(queries):
-        try:
-            # Используем улучшенный поиск с большими задержками
-            search_result = perform_search(
-                search_query,
-                max_results=3,
-                max_snippet_length=600
-            )
-            all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
-            
-            # Большая случайная задержка между запросами
-            delay = random.uniform(5.0, 10.0)
-            status_area.info(f"⏳ Пауза {delay:.1f} сек перед следующим запросом...")
-            time.sleep(delay)
-            
-        except Exception as e:
-            st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
-            all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"            
-        except Exception as e:
-            st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
-            all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"        
+        # Этап 2: Поиск информации
+        status_area.info("🔍 Выполняю поиск информации...")
+        all_search_results = ""
+        
+        for i, search_query in enumerate(queries):
+            try:
+                # Уменьшаем количество результатов и увеличиваем задержку
+                search_result = perform_search(
+                    search_query,
+                    max_results=3,
+                    max_snippet_length=800
+                )
+                all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
+                time.sleep(random.uniform(2.0, 5.0))  # Случайная задержка между запросами
+            except Exception as e:
+                st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
+                all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"
+        
         st.session_state.search_results = all_search_results
         
         with st.expander("🔍 Результаты поиска", expanded=False):
