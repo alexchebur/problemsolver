@@ -6,6 +6,10 @@ from bs4 import BeautifulSoup
 from typing import List, Dict
 import re
 
+if st.secrets.get("network", {}).get("enableProxy", False):
+    os.environ["HTTP_PROXY"] = "http://proxy.streamlit.io:3128"
+    os.environ["HTTPS_PROXY"] = "http://proxy.streamlit.io:3128"
+
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
