@@ -1,7 +1,7 @@
 import time
 import random
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict
 from duckduckgo_search import DDGS
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -9,22 +9,19 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Список User-Agent для анти-бан системы
+# Обновленные User-Agent для 2024-2025
 USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.78 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0"
 ]
 
-def get_random_user_agent():
-    return random.choice(USER_AGENTS)
-
 class WebSearcher:
-    def __init__(self, max_retries=3, delay_range=(2.0, 5.0)):
-        self.user_agent = get_random_user_agent()
+    def __init__(self, max_retries=3, delay_range=(3.0, 6.0)):
         self.max_retries = max_retries
         self.delay_range = delay_range
-        self.ddgs = DDGS(headers={'User-Agent': self.user_agent})  # ✅ Создаем один раз
+        # Создаем единственный экземпляр DDGS
+        self.ddgs = DDGS(headers={'User-Agent': random.choice(USER_AGENTS)})
 
     @retry(
         stop=stop_after_attempt(3),
@@ -32,41 +29,36 @@ class WebSearcher:
         retry=retry_if_exception_type((Exception,))
     )
     def perform_search(self, query: str, max_results: int = 5) -> List[Dict]:
-        """
-        Выполняет поиск через DuckDuckGo и возвращает результаты.
-
-        :param query: Поисковый запрос
-        :param max_results: Максимальное количество результатов
-        :return: Список результатов поиска
-        """
         try:
             logger.info(f"Выполняю поиск: {query}")
-            time.sleep(random.uniform(*self.delay_range))  # ✅ Случайная задержка
-
-            results = self.ddgs.text(query, max_results=max_results, backend="auto")
-
+            
+            # Используем автоматический выбор бэкенда
+            results = self.ddgs.text(
+                query, 
+                max_results=max_results, 
+                backend="auto"  # Ключевое изменение
+            )
+            
             if not results:
                 logger.warning(f"Нет результатов для: {query}")
                 return []
-
+                
             return results
 
         except Exception as e:
             logger.error(f"Ошибка при поиске '{query}': {str(e)}")
             raise
+        finally:
+            # Задержка ТОЛЬКО между запросами
+            time.sleep(random.uniform(*self.delay_range))
 
     def batch_search(self, queries: List[str], max_results: int = 5) -> Dict[str, List[Dict]]:
-        """
-        Выполняет несколько поисковых запросов.
-
-        :param queries: Список поисковых запросов
-        :param max_results: Максимальное количество результатов на каждый запрос
-        :return: Словарь с результатами по каждому запросу
-        """
         results = {}
         for query in queries:
             try:
                 results[query] = self.perform_search(query, max_results)
             except Exception as e:
                 results[query] = [{"error": str(e)}]
+                # Обновляем User-Agent после ошибки
+                self.ddgs = DDGS(headers={'User-Agent': random.choice(USER_AGENTS)})
         return results
