@@ -7,8 +7,9 @@ from io import BytesIO
 from fpdf import FPDF
 import base64
 import os
-from duckduckgo_search import DDGS
+#from duckduckgo_search import DDGS - удалили из-за выделения вебпоиска в отдельный скрипт
 from datetime import datetime
+from websearch import perform_search  # Новый импорт
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
@@ -72,35 +73,35 @@ ADDITIONAL_METHODS = [
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
 
-def perform_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
-    """Выполняет поиск и отображает результаты в сайдбаре"""
-    try:
-        with DDGS() as ddgs:
-            results = []
-            st.sidebar.subheader("Результаты поиска")
+#def perform_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
+#    """Выполняет поиск и отображает результаты в сайдбаре"""
+#    try:
+#        with DDGS() as ddgs:
+#            results = []
+#            st.sidebar.subheader("Результаты поиска")
             
-            for r in ddgs.text(
-                query,
-                region=region,
-                max_results=max_results,
-                backend="lite"
-            ):
-                snippet = r['body'][:500] + "..." if len(r['body']) > 500 else r['body']
-                results.append(r)
+#            for r in ddgs.text(
+#                query,
+#                region=region,
+#                max_results=max_results,
+#                backend="lite"
+#            ):
+#                snippet = r['body'][:500] + "..." if len(r['body']) > 500 else r['body']
+#                results.append(r)
                 
-                with st.sidebar.expander(f"🔍 {r['title']}"):
-                    st.write(snippet)
-                    st.caption(f"URL: {r['href']}")
+#                with st.sidebar.expander(f"🔍 {r['title']}"):
+#                    st.write(snippet)
+#                    st.caption(f"URL: {r['href']}")
 
-            formatted = []
-            for i, r in enumerate(results, 1):
-                body = r['body'][:max_snippet_length] + "..." if len(r['body']) > max_snippet_length else r['body']
-                formatted.append(f"Результат {i}: {r['title']}\n{body}\nURL: {r['href']}\n")
+#            formatted = []
+#            for i, r in enumerate(results, 1):
+#                body = r['body'][:max_snippet_length] + "..." if len(r['body']) > max_snippet_length else r['body']
+#                formatted.append(f"Результат {i}: {r['title']}\n{body}\nURL: {r['href']}\n")
             
-            return "\n\n".join(formatted)
-    except Exception as e:
-        st.sidebar.error(f"Ошибка поиска: {str(e)}")
-        return f"Ошибка поиска: {str(e)}"
+#            return "\n\n".join(formatted)
+#    except Exception as e:
+#        st.sidebar.error(f"Ошибка поиска: {str(e)}")
+#        return f"Ошибка поиска: {str(e)}"
 
 def parse_docx(uploaded_file):
     try:
@@ -353,9 +354,16 @@ def generate_response():
         # Этап 2: Поиск информации
         status_area.info("🔍 Выполняю поиск информации...")
         all_search_results = ""
-        
+    
         for i, search_query in enumerate(queries):
-            search_result = perform_search(search_query)
+            # Используем новую функцию поиска с параметрами
+            search_result = perform_search(
+                search_query,
+                region='ru-ru',
+                max_results=5,  # Можно уменьшить для ускорения
+                retries=5,      # Увеличим количество попыток
+                delay=1         # Базовая задержка
+            )
             all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
         
         st.session_state.search_results = all_search_results
