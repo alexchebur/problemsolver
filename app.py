@@ -350,21 +350,27 @@ def generate_response():
         if hasattr(st.session_state, 'internal_dialog'):
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
-        
-        # Этап 2: Поиск информации
-        status_area.info("🔍 Выполняю поиск информации...")
-        all_search_results = ""
-        
-        for i, search_query in enumerate(queries):
-            try:
-                search_result = perform_search(search_query, max_results=5)
-                all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
-                time.sleep(1.5)  # Задержка между запросами
-            except Exception as e:
-                st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
-                all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"
-        
-        st.session_state.search_results = all_search_results
+
+    
+    # Этап 2: Поиск информации
+    status_area.info("🔍 Выполняю поиск информации...")
+    all_search_results = ""
+    
+    for i, search_query in enumerate(queries):
+        try:
+            # Уменьшаем количество результатов и увеличиваем задержку
+            search_result = perform_search(
+                search_query,
+                max_results=3,
+                max_snippet_length=800
+            )
+            all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
+            time.sleep(random.uniform(2.0, 5.0))  # Случайная задержка между запросами
+        except Exception as e:
+            st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
+            all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"
+    
+
         
         with st.expander("🔍 Результаты поиска", expanded=False):
             st.text(all_search_results[:10000] + ("..." if len(all_search_results) > 10000 else ""))
