@@ -31,39 +31,20 @@ class GoogleCSESearcher:
             self._search_bing_ru
         ]
 
-    def get_full_page_content(self, url: str) -> str:
-    """Получение полного текста страницы"""
-        try:
-            headers = {'User-Agent': random.choice(USER_AGENTS)}
-            response = self.session.get(url, headers=headers, timeout=15)
-            response.raise_for_status()
-        
-            # Упрощенный парсинг основного контента
-            #from bs4 import BeautifulSoup
-            soup = BeautifulSoup(response.text, 'html.parser')
-        
-            # Удаляем ненужные элементы
-            for tag in soup(['script', 'style', 'footer', 'nav', 'aside']):
-                tag.decompose()
-        
-            # Извлекаем текст
-            text = ' '.join(soup.stripped_strings)
-            return text[:10000]  # Ограничение до 10k символов
-        
-        except Exception as e:
-            logger.error(f"Ошибка получения контента: {str(e)}")
-            return ""
-
-
-    
     def perform_search(self, query: str, max_results: int = 3, full_text=False) -> List[Dict]:
-        results = self._search_google_cse(query, max_results)
-    
-        if full_text:
-            for item in results:
-                item['full_content'] = self.get_full_page_content(item['url'])
-    
-        return results
+        """Основной метод поиска через Google CSE с резервными вариантами"""
+        try:
+            # Попытка поиска через Google CSE API
+            results = self._search_google_cse(query, max_results)
+            if results:
+                logger.info("Успешный поиск через Google CSE API")
+                
+                # Если запрошен полный текст, добавляем его
+                if full_text:
+                    for item in results:
+                        item['full_content'] = self.get_full_page_content(item['url'])
+                
+                return results
                 
             # Если CSE не вернул результатов, пробуем резервные методы
             for searcher in self.fallback_searchers:
@@ -124,17 +105,12 @@ class GoogleCSESearcher:
         response = self.session.get(url, params=params, headers=headers, timeout=15)
         response.raise_for_status()
         
-        # Простейший парсинг результатов
-        results = []
-        # Здесь должна быть реализация парсинга, аналогичная предыдущим примерам
-        # Для экономии места оставлю заглушку
-        results.append({
+        # Здесь должен быть парсинг результатов, но для примера заглушка
+        return [{
             'title': 'Резервный результат Google',
             'url': 'https://www.google.com',
             'snippet': 'Это результат резервного поиска Google'
-        })
-        
-        return results[:max_results]
+        }]
 
     def _search_bing_ru(self, query: str, max_results: int) -> List[Dict]:
         """Поиск через Bing (резервный метод)"""
@@ -150,13 +126,31 @@ class GoogleCSESearcher:
         response = self.session.get(url, params=params, headers=headers, timeout=15)
         response.raise_for_status()
         
-        # Простейший парсинг результатов
-        results = []
-        # Здесь должна быть реализация парсинга, аналогичная предыдущим примерам
-        results.append({
+        # Здесь должен быть парсинг результатов, но для примера заглушка
+        return [{
             'title': 'Резервный результат Bing',
             'url': 'https://www.bing.com',
             'snippet': 'Это результат резервного поиска Bing'
-        })
-        
-        return results[:max_results]
+        }]
+
+    def get_full_page_content(self, url: str) -> str:
+        """Получение полного текста страницы"""
+        try:
+            headers = {'User-Agent': random.choice(USER_AGENTS)}
+            response = self.session.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            
+            # Упрощенный парсинг основного контента
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Удаляем ненужные элементы
+            for tag in soup(['script', 'style', 'footer', 'nav', 'aside']):
+                tag.decompose()
+            
+            # Извлекаем текст
+            text = ' '.join(soup.stripped_strings)
+            return text[:10000]  # Ограничение до 10k символов
+            
+        except Exception as e:
+            logger.error(f"Ошибка получения контента: {str(e)}")
+            return ""
