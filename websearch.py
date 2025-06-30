@@ -45,7 +45,7 @@ def mojeek_search(query, max_results=5):
     except Exception as e:
         return f"Ошибка Mojeek: {str(e)}"
 
-def perform_search(query):
+def perform_search(query, region='ru-ru', max_results=5):
     # Используйте DuckDuckGo, затем Mojeek, затем резервные источники
     result = duckduckgo_html_search(query)
     if "Ошибка" in result:
