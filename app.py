@@ -167,7 +167,7 @@ def formulate_problem_and_queries():
     query = st.session_state.input_query.strip()
     doc_text = st.session_state.current_doc_text[:300000]
     
-    # Инструкция для LLM с использованием инструментов поиска
+    # Инструкция для LLM
     prompt = f"""
     Вы - эксперт по решению проблем. Проанализируйте запрос пользователя и документ (если есть):
     
@@ -181,7 +181,13 @@ def formulate_problem_and_queries():
     4. Примените First Principles Thinking и System 2 Thinking
     
     Требования:
-    - Вывод структурировать: ПРОБЛЕМА: ... \n ЗАПРОСЫ: 1. ... 2. ...
+    - Вывод структурировать: 
+        ПРОБЛЕМА: ... 
+        ВНУТРЕННИЙ ДИАЛОГ: ...
+        ЗАПРОСЫ:
+        1. ...
+        2. ...
+        ...
     - Каждый запрос должен быть самодостаточным для поиска
     """
     
@@ -192,7 +198,6 @@ def formulate_problem_and_queries():
                 "temperature": st.session_state.temperature,
                 "max_output_tokens": 4000
             },
-            tools=[{"google_search": {}}],
             request_options={'timeout': 120}
         )
         
@@ -200,19 +205,50 @@ def formulate_problem_and_queries():
         
         # Парсинг результатов
         problem = ""
+        internal_dialog = ""
         queries = []
         
+        # Пытаемся распарсить структурированный ответ
         if "ПРОБЛЕМА:" in result:
             problem_part = result.split("ПРОБЛЕМА:")[1]
-            problem = problem_part.split("ЗАПРОСЫ:")[0].strip() if "ЗАПРОСЫ:" in problem_part else problem_part.strip()
+            if "ВНУТРЕННИЙ ДИАЛОГ:" in problem_part:
+                problem = problem_part.split("ВНУТРЕННИЙ ДИАЛОГ:")[0].strip()
+                internal_dialog_part = problem_part.split("ВНУТРЕННИЙ ДИАЛОГ:")[1]
+                if "ЗАПРОСЫ:" in internal_dialog_part:
+                    internal_dialog = internal_dialog_part.split("ЗАПРОСЫ:")[0].strip()
+                    queries_part = internal_dialog_part.split("ЗАПРОСЫ:")[1]
+                    # Извлекаем запросы по нумерованному списку
+                    for line in queries_part.split('\n'):
+                        if line.strip() and line.strip()[0].isdigit():
+                            # Убираем номер и точку
+                            query_text = line.split('.', 1)[1].strip() if '. ' in line else line.strip()
+                            queries.append(query_text)
+            else:
+                # Пытаемся извлечь только проблему и запросы
+                if "ЗАПРОСЫ:" in problem_part:
+                    problem = problem_part.split("ЗАПРОСЫ:")[0].strip()
+                    queries_part = problem_part.split("ЗАПРОСЫ:")[1]
+                    for line in queries_part.split('\n'):
+                        if line.strip() and line.strip()[0].isdigit():
+                            query_text = line.split('.', 1)[1].strip() if '. ' in line else line.strip()
+                            queries.append(query_text)
         
-        if "ЗАПРОСЫ:" in result:
-            queries_part = result.split("ЗАПРОСЫ:")[1]
-            queries = [q.strip() for q in queries_part.split('\n') if q.strip() and q.strip()[0].isdigit()]
-            queries = [q.split('.', 1)[1].strip() if '. ' in q else q for q in queries][:5]
+        # Если не удалось распарсить, возвращаем как есть
+        if not problem:
+            problem = result
+        if not queries:
+            # Попробуем найти запросы в последних строках
+            last_lines = result.split('\n')[-10:]
+            for line in last_lines:
+                if line.strip() and line.strip()[0].isdigit() and '.' in line:
+                    query_text = line.split('.', 1)[1].strip()
+                    queries.append(query_text)
+            if len(queries) > 5:
+                queries = queries[:5]
         
         st.session_state.problem_formulation = problem
-        st.session_state.generated_queries = queries
+        st.session_state.internal_dialog = internal_dialog
+        st.session_state.generated_queries = queries[:5]  # ограничиваем 5 запросами
         
         return result, queries
         
@@ -285,7 +321,6 @@ def generate_response():
     st.session_state.report_content = None
     status_area = st.empty()
     progress_bar = st.progress(0)
-    results_container = st.empty()
 
     try:
         query = st.session_state.input_query.strip()
@@ -300,6 +335,9 @@ def generate_response():
         with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
             st.subheader("Сформулированная проблема")
             st.write(st.session_state.problem_formulation)
+            if hasattr(st.session_state, 'internal_dialog'):
+                st.subheader("Внутренний диалог")
+                st.write(st.session_state.internal_dialog)
             st.subheader("Сгенерированные поисковые запросы")
             st.write(queries)
             st.subheader("Полный вывод LLM")
@@ -308,6 +346,8 @@ def generate_response():
         # Сохраняем для отчета
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
+        if hasattr(st.session_state, 'internal_dialog'):
+            full_report += f"Внутренний диалог:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
         
         # Этап 2: Поиск информации
