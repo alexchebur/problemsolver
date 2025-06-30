@@ -10,6 +10,7 @@ from fpdf import FPDF
 import base64
 import os
 from datetime import datetime
+from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
