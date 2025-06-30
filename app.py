@@ -346,7 +346,8 @@ def generate_response():
                 # Используем созданный экземпляр WebSearcher
                 #search_result_list = searcher.perform_search(
                     #search_query,
-                    #max_results=3
+                    #max_results=3,
+                    full_text=True
                 #)
             
             
