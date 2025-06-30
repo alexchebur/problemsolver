@@ -45,11 +45,36 @@ def mojeek_search(query, max_results=5):
     except Exception as e:
         return f"Ошибка Mojeek: {str(e)}"
 
-def perform_search(query, region='ru-ru', max_results=5, max_snippet_length=800):
-    # Используйте DuckDuckGo, затем Mojeek, затем резервные источники
-    result = duckduckgo_html_search(query)
-    if "Ошибка" in result:
-        result = mojeek_search(query)
+def perform_search(query, region='ru-ru', max_results=8, max_snippet_length=3000):
+    try:
+        headers = {'User-Agent': get_random_user_agent()}
+        with DDGS(headers=headers) as ddgs:  # Укажите заголовки
+            results = []
+            st.sidebar.subheader("Результаты поиска")
+            
+            # Используйте параметр backend="api" вместо "lite"
+            for r in ddgs.text(
+                query,
+                region=region,
+                max_results=max_results,
+                backend="api"  # Изменено на актуальный backend
+            ):
+                snippet = r['body'][:500] + "..." if len(r['body']) > 500 else r['body']
+                results.append(r)
+                
+                with st.sidebar.expander(f"🔍 {r['title']}"):
+                    st.write(snippet)
+                    st.caption(f"URL: {r['href']}")
+
+            formatted = []
+            for i, r in enumerate(results, 1):
+                body = r['body'][:max_snippet_length] + "..." if len(r['body']) > max_snippet_length else r['body']
+                formatted.append(f"Результат {i}: {r['title']}\n{body}\nURL: {r['href']}\n")
+            
+            return "\n\n".join(formatted)
+    except Exception as e:
+        st.sidebar.error(f"Ошибка поиска: {str(e)}")
+        return f"Ошибка поиска: {str(e)}"
     if "Ошибка" in result:
         result = "Все поисковики недоступны. Попробуйте позже."
     return result
