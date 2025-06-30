@@ -9,7 +9,8 @@ from fpdf import FPDF
 import base64
 import os
 from datetime import datetime
-from websearch import WebSearcher  # Измененный импорт
+#from websearch import WebSearcher  # Измененный импорт, вернуть если GoogleSearcher не взлетит
+from websearch import GoogleSearcher
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
 if not api_key:
