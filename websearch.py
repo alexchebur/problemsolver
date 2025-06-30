@@ -3,71 +3,36 @@ import random
 import logging
 from typing import List, Dict
 from duckduckgo_search import DDGS
-import requests
-from bs4 import BeautifulSoup
-from tenacity import retry, stop_after_attempt, wait_fixed
-from googlesearch import search
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Обновленные User-Agent для 2024-2025
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.78 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0"
-]
-
-
-
-class GoogleSearcher:
-    def perform_search(self, query: str, max_results: int = 5) -> List[Dict]:
-        try:
-            results = []
-            for url in search(query, num_results=max_results, lang="ru"):
-                results.append({
-                    'title': '',
-                    'url': url,
-                    'snippet': ''
-                })
-            return results
-        except Exception as e:
-            return [{"error": str(e)}]
-
-# В app.py замените:
-# searcher = WebSearcher()
-searcher = GoogleSearcher()
-
-
 class WebSearcher:
-    def __init__(self, max_retries=3, delay_range=(3.0, 6.0)):
-        self.max_retries = max_retries
-        self.delay_range = delay_range
-        # Создаем единственный экземпляр DDGS
-        self.ddgs = DDGS(headers={'User-Agent': random.choice(USER_AGENTS)})
-        logger.info("Инициализирован экземпляр DDGS")
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_fixed(2)
-    )
-    def perform_search(self, query: str, max_results: int = 5) -> List[Dict]:
+    def __init__(self):
+        # Простая инициализация без параметров
+        self.ddgs = None
+        self._init_ddgs()
+        
+    def _init_ddgs(self):
+        """Инициализация экземпляра DDGS"""
         try:
-            logger.info(f"Выполняю поиск: {query}")
+            # Простая инициализация как в рабочем скрипте
+            self.ddgs = DDGS()
+            logger.info("Инициализирован экземпляр DDGS")
+        except Exception as e:
+            logger.error(f"Ошибка инициализации DDGS: {str(e)}")
+            self.ddgs = None
+
+    def perform_search(self, query: str, max_results: int = 3) -> List[Dict]:
+        """Основной метод поиска как в рабочем скрипте"""
+        try:
+            logger.info(f"Ищу: {query}")
             
-            # ПРЯМОЙ ВЫЗОВ DDGS БЕЗ ЛИШНЕЙ ЛОГИКИ - как в рабочем скрипте
-            results = self.ddgs.text(
-                query, 
-                max_results=max_results, 
-                backend="auto"  # Автоматический выбор бэкенда
-            )
+            # ТОЧНО ТАКОЙ ЖЕ ВЫЗОВ КАК В РАБОЧЕМ СКРИПТЕ
+            results = self.ddgs.text(query, max_results=max_results, backend="auto")
             
-            if not results:
-                logger.warning(f"Нет результатов для: {query}")
-                return []
-            
-            logger.info(f"Успешно найдено {len(results)} результатов для: {query}")
+            logger.info(f"Успешно найдено для: {query}")
             
             # Форматируем результаты в простую структуру
             formatted_results = []
@@ -79,32 +44,24 @@ class WebSearcher:
                 })
             
             return formatted_results
-
+            
         except Exception as e:
-            logger.error(f"Ошибка при поиске '{query}': {str(e)}")
-            # ПЕРЕИНИЦИАЛИЗИРУЕМ DDGS ПРИ ОШИБКЕ
-            self._refresh_ddgs_instance()
-            raise
+            logger.error(f"Ошибка поиска для '{query}': {str(e)}")
+            # Переинициализация после ошибки
+            self._init_ddgs()
+            return [{
+                "error": str(e),
+                "message": "Не удалось выполнить поиск"
+            }]
         finally:
-            # Задержка между запросами как в Colab
-            delay = random.uniform(*self.delay_range)
+            # Точная задержка как в рабочем скрипте
+            delay = random.uniform(3.0, 6.0)
             logger.info(f"Задержка {delay:.2f} сек")
             time.sleep(delay)
 
-    def _refresh_ddgs_instance(self):
-        """Обновляет экземпляр DDGS с новым User-Agent"""
-        logger.warning("Обновление экземпляра DDGS")
-        self.ddgs = DDGS(headers={'User-Agent': random.choice(USER_AGENTS)})
-
-    def batch_search(self, queries: List[str], max_results: int = 5) -> Dict[str, List[Dict]]:
+    def batch_search(self, queries: List[str], max_results: int = 3) -> Dict[str, List[Dict]]:
+        """Пакетный поиск как в рабочем скрипте"""
         results = {}
         for query in queries:
-            try:
-                results[query] = self.perform_search(query, max_results)
-            except Exception as e:
-                logger.exception(f"Неустранимая ошибка для запроса '{query}'")
-                results[query] = [{
-                    "error": str(e),
-                    "message": "Не удалось получить результаты поиска"
-                }]
+            results[query] = self.perform_search(query, max_results)
         return results
