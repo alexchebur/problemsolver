@@ -22,14 +22,14 @@ class WebSearcher:
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': random.choice(USER_AGENTS)})
         self.search_engines = [
-            self._search_google,
-            self._search_bing,
             self._search_yandex,
-            self._search_duckduckgo_html
+            self._search_google_ru,
+            self._search_bing_ru,
         ]
+        self.ru_domain_pattern = re.compile(r'\.ru/|\.рф/|\.su/|\.xn--p1ai/')
 
     def perform_search(self, query: str, max_results: int = 3) -> List[Dict]:
-        """Универсальный метод поиска с резервными системами"""
+        """Поиск с фокусом на русскоязычные результаты"""
         try:
             # Очистка запроса
             clean_query = re.sub(r'[^\w\s]', '', query).strip()
@@ -42,7 +42,7 @@ class WebSearcher:
                     results = search_method(clean_query, max_results)
                     if results:
                         logger.info(f"Успешный поиск через {search_method.__name__}")
-                        return results
+                        return self._filter_ru_domains(results)
                 except Exception as e:
                     logger.warning(f"Ошибка в {search_method.__name__}: {str(e)}")
                     time.sleep(2)
@@ -52,132 +52,148 @@ class WebSearcher:
             return [{"error": f"Критическая ошибка: {str(e)}"}]
         finally:
             time.sleep(random.uniform(*self.delay_range))
-
-    def _search_google(self, query: str, max_results: int) -> List[Dict]:
-        """Поиск через Google"""
-        url = "https://www.google.com/search"
-        params = {'q': query, 'num': max_results, 'hl': 'ru'}
-        headers = {'User-Agent': random.choice(USER_AGENTS)}
-        
-        response = self.session.get(url, params=params, headers=headers, timeout=15)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        results = []
-        
-        for g in soup.select('div.g')[:max_results]:
-            title_elem = g.select_one('h3')
-            link_elem = g.select_one('a[href]')
-            snippet_elem = g.select_one('div.IsZvec')
-            
-            if not title_elem or not link_elem:
-                continue
-                
-            title = title_elem.get_text()
-            url = link_elem['href']
-            snippet = snippet_elem.get_text()[:500] if snippet_elem else ''
-            
-            # Фильтрация URL Google
-            if url.startswith('/search?') or url.startswith('/url?'):
-                continue
-                
-            results.append({
-                'title': title,
-                'url': url,
-                'snippet': snippet
-            })
-        
-        return results
-
-    def _search_bing(self, query: str, max_results: int) -> List[Dict]:
-        """Поиск через Bing"""
-        url = "https://www.bing.com/search"
-        params = {'q': query, 'count': max_results}
-        headers = {'User-Agent': random.choice(USER_AGENTS)}
-        
-        response = self.session.get(url, params=params, headers=headers, timeout=15)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        results = []
-        
-        for result in soup.select('li.b_algo')[:max_results]:
-            title_elem = result.select_one('h2')
-            link_elem = result.select_one('a')
-            snippet_elem = result.select_one('p')
-            
-            if not title_elem or not link_elem:
-                continue
-                
-            results.append({
-                'title': title_elem.get_text(),
-                'url': link_elem['href'],
-                'snippet': snippet_elem.get_text()[:500] if snippet_elem else ''
-            })
-        
-        return results
+    
+    def _filter_ru_domains(self, results: List[Dict]) -> List[Dict]:
+        """Фильтрация результатов по RU доменам"""
+        filtered = []
+        for r in results:
+            url = r.get('url', '')
+            if self.ru_domain_pattern.search(url):
+                filtered.append(r)
+            elif not url:  # Если URL отсутствует, оставляем
+                filtered.append(r)
+        return filtered or results[:1]  # Возвращаем хотя бы один результат
 
     def _search_yandex(self, query: str, max_results: int) -> List[Dict]:
-        """Поиск через Yandex (для русскоязычных запросов)"""
+        """Поиск через Yandex с акцентом на RU домены"""
         url = "https://yandex.ru/search/"
         params = {'text': query, 'numdoc': max_results}
         headers = {'User-Agent': random.choice(USER_AGENTS)}
         
-        response = self.session.get(url, params=params, headers=headers, timeout=15)
+        response = self.session.get(url, params=params, headers=headers, timeout=20)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
         results = []
         
         for result in soup.select('li.serp-item')[:max_results]:
-            title_elem = result.select_one('h2 a')
-            snippet_elem = result.select_one('.organic__content-wrapper')
-            
-            if not title_elem:
-                continue
+            try:
+                title_elem = result.select_one('h2 a')
+                snippet_elem = result.select_one('.organic__content-wrapper')
                 
-            results.append({
-                'title': title_elem.get_text(),
-                'url': title_elem['href'],
-                'snippet': snippet_elem.get_text()[:500] if snippet_elem else ''
-            })
+                if not title_elem:
+                    continue
+                    
+                title = title_elem.get_text()
+                url = title_elem['href']
+                snippet = snippet_elem.get_text()[:500] if snippet_elem else ''
+                
+                # Исправляем относительные URL
+                if url.startswith('/'):
+                    url = 'https://yandex.ru' + url
+                
+                results.append({
+                    'title': title,
+                    'url': url,
+                    'snippet': snippet
+                })
+            except Exception as e:
+                logger.warning(f"Ошибка парсинга результата Yandex: {str(e)}")
+                continue
         
         return results
 
-    def _search_duckduckgo_html(self, query: str, max_results: int) -> List[Dict]:
-        """Резервный метод поиска через HTML DuckDuckGo"""
-        url = "https://html.duckduckgo.com/html/"
-        params = {'q': query, 'kl': 'ru-ru'}
+    def _search_google_ru(self, query: str, max_results: int) -> List[Dict]:
+        """Поиск через Google с RU регионом и языком"""
+        url = "https://www.google.com/search"
+        params = {
+            'q': query,
+            'num': max_results,
+            'hl': 'ru',
+            'lr': 'lang_ru',
+            'cr': 'countryRU'
+        }
         headers = {'User-Agent': random.choice(USER_AGENTS)}
         
-        response = self.session.post(url, data=params, headers=headers, timeout=15)
+        response = self.session.get(url, params=params, headers=headers, timeout=20)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
         results = []
         
-        for result in soup.select('.result')[:max_results]:
-            title_elem = result.select_one('.result__title a')
-            url_elem = result.select_one('.result__url')
-            snippet_elem = result.select_one('.result__snippet')
-            
-            if not title_elem or not url_elem:
-                continue
+        for g in soup.select('div.g')[:max_results]:
+            try:
+                title_elem = g.select_one('h3')
+                link_elem = g.select_one('a[href]')
+                snippet_elem = g.select_one('div.IsZvec')
                 
-            title = title_elem.text.strip()
-            url = url_elem['href'].strip() if 'href' in url_elem.attrs else ''
-            snippet = snippet_elem.text.strip()[:500] if snippet_elem else ''
-            
-            # Исправляем относительные URL
-            if url.startswith('//'):
-                url = 'https:' + url
-            elif url.startswith('/'):
-                url = 'https://duckduckgo.com' + url
-            
-            results.append({
-                'title': title,
-                'url': url,
-                'snippet': snippet
-            })
+                if not title_elem or not link_elem:
+                    continue
+                    
+                title = title_elem.get_text()
+                url = link_elem['href']
+                snippet = snippet_elem.get_text()[:500] if snippet_elem else ''
+                
+                # Фильтрация URL Google
+                if url.startswith('/search?') or url.startswith('/url?'):
+                    continue
+                
+                # Исправляем относительные URL
+                if url.startswith('/'):
+                    url = 'https://www.google.com' + url
+                
+                results.append({
+                    'title': title,
+                    'url': url,
+                    'snippet': snippet
+                })
+            except Exception as e:
+                logger.warning(f"Ошибка парсинга результата Google: {str(e)}")
+                continue
+        
+        return results
+
+    def _search_bing_ru(self, query: str, max_results: int) -> List[Dict]:
+        """Поиск через Bing с RU регионом и языком"""
+        url = "https://www.bing.com/search"
+        params = {
+            'q': query,
+            'count': max_results,
+            'setmkt': 'ru-RU',
+            'setlang': 'ru'
+        }
+        headers = {'User-Agent': random.choice(USER_AGENTS)}
+        
+        response = self.session.get(url, params=params, headers=headers, timeout=20)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        
+        for result in soup.select('li.b_algo')[:max_results]:
+            try:
+                title_elem = result.select_one('h2')
+                link_elem = result.select_one('a')
+                snippet_elem = result.select_one('p')
+                
+                if not title_elem or not link_elem:
+                    continue
+                    
+                title = title_elem.get_text()
+                url = link_elem['href']
+                snippet = snippet_elem.get_text()[:500] if snippet_elem else ''
+                
+                # Исправляем относительные URL
+                if url.startswith('/'):
+                    url = 'https://www.bing.com' + url
+                
+                results.append({
+                    'title': title,
+                    'url': url,
+                    'snippet': snippet
+                })
+            except Exception as e:
+                logger.warning(f"Ошибка парсинга результата Bing: {str(e)}")
+                continue
         
         return results
