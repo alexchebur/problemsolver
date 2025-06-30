@@ -17,11 +17,9 @@ USER_AGENTS = [
 ]
 
 class WebSearcher:
-    def __init__(self, max_retries=3, delay_range=(3.0, 6.0)):
+    def __init__(self, max_retries=3, delay_range=(5.0, 10.0)):
         self.max_retries = max_retries
         self.delay_range = delay_range
-        # Создаем единственный экземпляр DDGS
-        self.ddgs = DDGS(headers={'User-Agent': random.choice(USER_AGENTS)})
 
     @retry(
         stop=stop_after_attempt(3),
@@ -29,36 +27,51 @@ class WebSearcher:
         retry=retry_if_exception_type((Exception,))
     )
     def perform_search(self, query: str, max_results: int = 5) -> List[Dict]:
+        user_agent = random.choice(USER_AGENTS)
         try:
             logger.info(f"Выполняю поиск: {query}")
             
-            # Используем автоматический выбор бэкенда
-            results = self.ddgs.text(
-                query, 
-                max_results=max_results, 
-                backend="auto"  # Ключевое изменение
-            )
+            # Создаем новый экземпляр DDGS для каждого запроса
+            with DDGS(headers={'User-Agent': user_agent}, timeout=20) as ddgs:
+                results = ddgs.text(
+                    keywords=query,
+                    max_results=max_results,
+                    backend="api"  # Используем стабильный API-бэкенд
+                )
             
             if not results:
                 logger.warning(f"Нет результатов для: {query}")
                 return []
                 
-            return results
+            # Фильтруем некорректные результаты
+            valid_results = []
+            for r in results:
+                if not r.get('href', '').startswith(('http://www.google.com', 'https://www.google.com')):
+                    valid_results.append({
+                        'title': r.get('title', ''),
+                        'url': r.get('href', ''),
+                        'snippet': r.get('body', '')
+                    })
+            
+            return valid_results
 
         except Exception as e:
             logger.error(f"Ошибка при поиске '{query}': {str(e)}")
             raise
-        finally:
-            # Задержка ТОЛЬКО между запросами
-            time.sleep(random.uniform(*self.delay_range))
 
     def batch_search(self, queries: List[str], max_results: int = 5) -> Dict[str, List[Dict]]:
         results = {}
-        for query in queries:
+        for i, query in enumerate(queries):
             try:
                 results[query] = self.perform_search(query, max_results)
             except Exception as e:
+                logger.exception(f"Критическая ошибка для запроса '{query}'")
                 results[query] = [{"error": str(e)}]
-                # Обновляем User-Agent после ошибки
-                self.ddgs = DDGS(headers={'User-Agent': random.choice(USER_AGENTS)})
+            
+            # Задержка между запросами (кроме последнего)
+            if i < len(queries) - 1:
+                delay = random.uniform(*self.delay_range)
+                logger.info(f"Задержка {delay:.2f} сек перед следующим запросом")
+                time.sleep(delay)
+                
         return results
