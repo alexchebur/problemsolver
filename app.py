@@ -351,6 +351,7 @@ def generate_response():
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
 
+
     
     # Этап 2: Поиск информации
     status_area.info("🔍 Выполняю поиск информации...")
@@ -371,6 +372,9 @@ def generate_response():
             status_area.info(f"⏳ Пауза {delay:.1f} сек перед следующим запросом...")
             time.sleep(delay)
             
+        except Exception as e:
+            st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
+            all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"            
         except Exception as e:
             st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
             all_search_results += f"### Ошибка поиска для запроса '{search_query}': {str(e)}\n\n"        
