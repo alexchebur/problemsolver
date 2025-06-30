@@ -351,21 +351,15 @@ def generate_response():
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
         
-        # Этап 2: Поиск информации
-        status_area.info("🔍 Выполняю поиск информации...")
-        all_search_results = ""
+
     
-        for i, search_query in enumerate(queries):
-            # Используем новую функцию поиска с параметрами
-            search_result = perform_search(
-                search_query,
-                region='ru-ru',
-                max_results=5,  # Уменьшенное количество результатов
-                retries=3,       # Количество попыток
-                delay=1.5        # Базовая задержка
-            )
-            all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
-            time.sleep(1)  # Задержка между запросами
+    # Этап 2: Поиск информации
+    
+    for i, search_query in enumerate(queries):
+        # Используем новую функцию поиска
+        search_result = perform_search(search_query, max_results=3)
+        all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result}\n\n"
+        time.sleep(1.5)  # Задержка между запросами
         
         st.session_state.search_results = all_search_results
         
