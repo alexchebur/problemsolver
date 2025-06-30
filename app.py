@@ -351,6 +351,16 @@ def generate_response():
                 all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
                 
                 # Показываем результаты в сайдбаре
+                if not search_result_list:
+                    st.warning(f"Нет результатов для: '{search_query}'")
+                    continue
+
+                if 'error' in search_result_list[0]:
+                    error_msg = search_result_list[0].get('error', 'Ошибка поиска')
+                    st.error(f"Ошибка поиска: {error_msg}")
+                    continue
+
+                
                 st.sidebar.subheader(f"Результаты по запросу: '{search_query}'")
                 for j, r in enumerate(search_result_list, 1):
                     title = r.get('title', 'Без названия')
