@@ -298,6 +298,14 @@ def generate_response():
     progress_bar = st.progress(0)
 
     try:
+        test_response = requests.get("https://www.google.com", timeout=10)
+        st.info(f"Сетевая доступность: {'OK' if test_response.status_code == 200 else 'Проблемы'}")
+    except Exception as e:
+        st.error(f"Сетевая ошибка: {str(e)}")
+
+    
+
+    try:
         query = st.session_state.input_query.strip()
         if not query:
             status_area.warning("⚠️ Введите запрос")
