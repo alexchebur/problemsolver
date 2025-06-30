@@ -25,7 +25,8 @@ genai.configure(
 )
 
 # Создаем экземпляр поисковика
-searcher = WebSearcher()  # ✅ Единый экземпляр для всего приложения
+#searcher = WebSearcher()  # ✅ Единый экземпляр для всего приложения
+searcher = GoogleSearcher()
 
 # Глобальные переменные состояния
 if 'current_doc_text' not in st.session_state:
