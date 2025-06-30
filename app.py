@@ -9,8 +9,8 @@ from fpdf import FPDF
 import base64
 import os
 from datetime import datetime
-#from websearch import WebSearcher  # Измененный импорт, вернуть если GoogleSearcher не взлетит
-from websearch import GoogleSearcher
+from websearch import WebSearcher  # Измененный импорт, вернуть если GoogleSearcher не взлетит
+#from websearch import GoogleSearcher # вернуть, если доработать GoogleSearcher
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
 if not api_key:
@@ -26,8 +26,8 @@ genai.configure(
 )
 
 # Создаем экземпляр поисковика
-#searcher = WebSearcher()  # ✅ Единый экземпляр для всего приложения
-searcher = GoogleSearcher()
+searcher = WebSearcher()  # ✅ Единый экземпляр для всего приложения
+#searcher = GoogleSearcher()
 
 # Глобальные переменные состояния
 if 'current_doc_text' not in st.session_state:
