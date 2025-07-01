@@ -31,7 +31,7 @@ class GoogleCSESearcher:
             self._search_bing_ru
         ]
 
-    def perform_search(self, query: str, max_results: int = 3, full_text=False) -> List[Dict]:
+    def perform_search(self, query: str, max_results: int = 3, full_text=True) -> List[Dict]:
         """Основной метод поиска через Google CSE с резервными вариантами"""
         try:
             # Попытка поиска через Google CSE API
