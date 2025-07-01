@@ -265,6 +265,52 @@ def apply_cognitive_method(method_name, context):
     except Exception as e:
         return f"Ошибка при применении {method_name}: {str(e)}"
 
+
+def generate_refinement_queries(context: str) -> List[str]:
+    """Генерирует уточняющие поисковые запросы на основе контекста"""
+    prompt = f"""
+    На основе проведенного анализа сформулируйте 3 уточняющих поисковых запроса, 
+    которые помогут проверить гипотезы и углубить понимание решения:
+    
+    {context[:30000]}
+    
+    Требования:
+    - Запросы должны быть конкретными и направленными на проверку гипотез
+    - Выведите только нумерованный список
+    - Формат:
+        1. [Запрос 1]
+        2. [Запрос 2]
+        3. [Запрос 3]
+    """
+    
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": st.session_state.temperature * 0.5,
+                "max_output_tokens": 2000
+            },
+            request_options={'timeout': 90}
+        )
+        result = response.text
+        
+        # Парсинг результатов
+        queries = []
+        for line in result.split('\n'):
+            if line.strip() and line.strip()[0].isdigit():
+                query_text = line.split('.', 1)[1].strip() if '. ' in line else line.strip()
+                queries.append(query_text)
+        
+        return queries[:3]  # возвращаем не более 3 запросов
+        
+    except Exception as e:
+        st.error(f"Ошибка при генерации уточняющих запросов: {str(e)}")
+        return []
+
+
+
+
+
 def generate_final_conclusions(context):
     """Генерирует итоговые выводы"""
     prompt = f"""
