@@ -357,8 +357,16 @@ def generate_response():
                 # Форматируем результаты
                 formatted_results = []
                 for j, r in enumerate(search_result_list, 1):
-                    body = r.get('body', '')[:1000] + "..." if len(r.get('body', '')) > 800 else r.get('body', '')
-                    formatted_results.append(f"Результат {j}: {r.get('title', '')}\n{body}\nURL: {r.get('href', '')}\n")
+                    # Используем полный контент если он есть, иначе сниппет
+                    content = r.get('full_content', r.get('snippet', ''))
+                    formatted_results.append(
+                        f"Результат {j}: {r.get('title', '')}\n"
+                        f"Контент: {content[:2000]}{'...' if len(content) > 2000 else ''}\n"
+                        f"URL: {r.get('url', '')}\n"
+                    )
+
+
+                
                 
                 search_result_str = "\n\n".join(formatted_results)
                 all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
@@ -389,6 +397,16 @@ def generate_response():
                         st.sidebar.markdown(f"[{url}]({url})")
                     if snippet:
                         st.sidebar.write(snippet[:300] + ('...' if len(snippet) > 300 else ''))
+
+                    st.sidebar.subheader(f"🔍 {title}")
+                    if url:
+                        st.sidebar.markdown(f"[{url}]({url})")
+
+                        # Кнопка для показа полного контента
+                    if st.sidebar.button(f"Показать полный текст", key=f"full_{i}_{j}"):
+                        st.sidebar.text_area(f"Полный текст: {title}", 
+                                             value=content[:5000], 
+                                             height=300)
                 
             except Exception as e:
                 st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
