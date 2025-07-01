@@ -100,8 +100,8 @@ def create_pdf(content, title="Отчет"):
         pdf.add_page()
         
         # Шрифты (должны быть доступны в системе)
-        pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
-        pdf.add_font('DejaVuB', '', 'DejaVuSansCondensed-Bold.ttf', uni=True)
+        pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
+        pdf.add_font('DejaVuB', '', 'fonts/DejaVuSansCondensed-Bold.ttf', uni=True)
         
         # Настройки документа
         pdf.set_auto_page_break(auto=True, margin=15)
