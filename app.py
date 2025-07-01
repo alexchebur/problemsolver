@@ -508,17 +508,56 @@ def generate_response():
                 full_report += f"### Ошибка при применении {method}: {str(e)}\n\n"
             
             time.sleep(1)
-
-
-
-
+#####################
 
         
-        # Этап 5: Итоговые выводы
+
+        # Этап 4: Уточняющий поиск
+        status_area.info("🔍 Выполняю уточняющий поиск...")
+        refinement_search_results = ""
+    
+        # Генерация уточняющих запросов
+        refinement_context = (
+            f"Проблема: {st.session_state.problem_formulation}\n"
+            f"Анализ методик: {' '.join(method_results.values())[:10000]}\n"
+        )
+    
+        refinement_queries = generate_refinement_queries(refinement_context)
+    
+        if refinement_queries:
+            # Выполнение уточняющего поиска
+            for i, query in enumerate(refinement_queries):
+                try:
+                    clean_query = query.replace('"', '').strip()
+                    search_results = searcher.perform_search(clean_query, max_results=2, full_text=True)
+                
+                    # Форматирование результатов
+                    formatted = []
+                    for j, r in enumerate(search_results, 1):
+                        content = r.get('full_content', r.get('snippet', ''))
+                        formatted.append(
+                            f"Результат {j}: {r.get('title', '')}\n"
+                            f"Контент: {content[:3000]}{'...' if len(content) > 3000 else ''}\n"
+                            f"URL: {r.get('url', '')}\n"
+                        )
+                
+                    refinement_search_results += f"### Уточняющий запрос '{query}':\n\n"
+                    refinement_search_results += "\n\n".join(formatted) + "\n\n"
+                
+                except Exception as e:
+                    refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
+    
+        # Добавляем результаты в отчет
+        full_report += f"### Уточняющий поиск ###\n\n{refinement_search_results}\n\n"
+    
+        # Обновляем контекст для финальных выводов
+        final_context = f"{context}\n\nРезультаты уточняющего поиска:\n{refinement_search_results}"
+    
+        # Этап 5: Итоговые выводы (с обновленным контекстом)
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
         try:
-            conclusions = generate_final_conclusions(full_report)
+            conclusions = generate_final_conclusions(final_context)  # <-- используем обновленный контекст
             
             with st.expander("📝 Итоговые выводы", expanded=True):
                 st.write(conclusions)
