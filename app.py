@@ -357,7 +357,7 @@ def generate_response():
                 # Форматируем результаты
                 formatted_results = []
                 for j, r in enumerate(search_result_list, 1):
-                    body = r.get('body', '')[:800] + "..." if len(r.get('body', '')) > 800 else r.get('body', '')
+                    body = r.get('body', '')[:1000] + "..." if len(r.get('body', '')) > 800 else r.get('body', '')
                     formatted_results.append(f"Результат {j}: {r.get('title', '')}\n{body}\nURL: {r.get('href', '')}\n")
                 
                 search_result_str = "\n\n".join(formatted_results)
