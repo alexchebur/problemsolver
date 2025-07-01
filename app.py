@@ -98,38 +98,71 @@ def create_pdf(content, title="Отчет"):
     try:
         pdf = FPDF()
         pdf.add_page()
-        font_path = "fonts/DejaVuSansCondensed.ttf"
         
-        if not os.path.exists(font_path):
-            st.error(f"🚫 Файл шрифта не найден: {font_path}")
-            return None
+        # Шрифты (должны быть доступны в системе)
+        pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+        pdf.add_font('DejaVuB', '', 'DejaVuSansCondensed-Bold.ttf', uni=True)
         
-        pdf.add_font('DejaVu', '', font_path, uni=True)
-        pdf.set_font('DejaVu', '', 12)
-        effective_width = 190
+        # Настройки документа
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_left_margin(10)
+        pdf.set_right_margin(10)
+        pdf.set_title(title)
         
-        paragraphs = content.split('\n')
+        # Заголовок документа
+        pdf.set_font('DejaVuB', '', 16)
+        pdf.cell(0, 10, txt=title, ln=1, align='C')
+        pdf.ln(10)
         
-        for para in paragraphs:
-            if not para.strip():
-                pdf.ln(6)
+        # Обработка контента
+        lines = content.split('\n')
+        in_list = False
+        list_indent = 0
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Пустые строки
+            if not line:
+                pdf.ln(5)
+                in_list = False
                 continue
                 
-            words = para.split()
-            current_line = ""
-            
-            for word in words:
-                test_line = current_line + " " + word if current_line else word
-                if pdf.get_string_width(test_line) <= effective_width:
-                    current_line = test_line
-                else:
-                    pdf.cell(0, 10, txt=current_line, ln=1)
-                    current_line = word
-            
-            if current_line:
-                pdf.cell(0, 10, txt=current_line, ln=1)
-            
-            pdf.ln(4)
+            # Заголовки 1-го уровня
+            if line.startswith('## '):
+                pdf.set_font('DejaVuB', '', 14)
+                pdf.cell(0, 10, txt=line[3:], ln=1)
+                pdf.set_font('DejaVu', '', 12)
+                pdf.ln(5)
+                in_list = False
+                continue
+                
+            # Заголовки 2-го уровня
+            if line.startswith('### '):
+                pdf.set_font('DejaVuB', '', 12)
+                pdf.cell(0, 8, txt=line[4:], ln=1)
+                pdf.set_font('DejaVu', '', 12)
+                pdf.ln(3)
+                in_list = False
+                continue
+                
+            # Списки
+            if line.startswith(('- ', '* ', '1. ', '2. ', '3. ', '4. ', '5. ')):
+                if not in_list:
+                    pdf.ln(3)
+                    in_list = True
+                pdf.set_font('DejaVu', '', 12)
+                pdf.cell(10)  # Отступ
+                bullet = '•' if line.startswith(('- ', '* ')) else ''
+                pdf.cell(0, 6, txt=f"{bullet} {line[2:]}", ln=1)
+                continue
+            else:
+                in_list = False
+                
+            # Обычный текст
+            pdf.set_font('DejaVu', '', 12)
+            pdf.multi_cell(0, 6, txt=line)
+            pdf.ln(2)
         
         buffer = BytesIO()
         pdf.output(buffer)
