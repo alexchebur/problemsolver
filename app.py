@@ -12,6 +12,7 @@ import os
 from datetime import datetime
 from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
+from typing import List, Tuple
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
 if not api_key:
