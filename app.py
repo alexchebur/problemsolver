@@ -525,6 +525,10 @@ def generate_response():
         refinement_queries = generate_refinement_queries(refinement_context)
     
         if refinement_queries:
+            if refinement_queries:
+                st.sidebar.subheader("🔎 Уточняющие запросы")
+                for i, query in enumerate(refinement_queries):
+                    st.sidebar.write(f"{i+1}. {query}")
             # Выполнение уточняющего поиска
             for i, query in enumerate(refinement_queries):
                 try:
