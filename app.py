@@ -361,7 +361,7 @@ def generate_response():
                     content = r.get('full_content', r.get('snippet', ''))
                     formatted_results.append(
                         f"Результат {j}: {r.get('title', '')}\n"
-                        f"Контент: {content[:2000]}{'...' if len(content) > 2000 else ''}\n"
+                        f"Контент: {content[:5000]}{'...' if len(content) > 5000 else ''}\n"
                         f"URL: {r.get('url', '')}\n"
                     )
 
