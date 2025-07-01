@@ -13,12 +13,12 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
 from typing import List, Tuple
+
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
 if not api_key:
     st.warning("Пожалуйста, введите API-ключ")
     st.stop()
-
 
 genai.configure(
     api_key=api_key,
@@ -29,8 +29,7 @@ genai.configure(
 )
 
 # Создаем экземпляр поисковика
-searcher = GoogleCSESearcher()  # ✅ Единый экземпляр для всего приложения
-#searcher = GoogleSearcher()
+searcher = GoogleCSESearcher()
 
 # Глобальные переменные состояния
 if 'current_doc_text' not in st.session_state:
@@ -53,7 +52,7 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 CORE_METHODS = [
     "First Principles Thinking",
     "Pareto Principle (80/20 Rule)",
-    "Occam’s Razor",
+    "Occam's Razor",
     "System 1 vs System 2 Thinking",
     "Second-Order Thinking"
 ]
@@ -62,10 +61,10 @@ ADDITIONAL_METHODS = [
     "Inversion (thinking backwards)",
     "Opportunity Cost",
     "Margin of Diminishing Returns",
-    "Hanlon’s Razor",
+    "Hanlon's Razor",
     "Confirmation Bias",
     "Availability Heuristic",
-    "Parkinson’s Law",
+    "Parkinson's Law",
     "Loss Aversion",
     "Switching Costs",
     "Circle of Competence",
@@ -145,7 +144,6 @@ def formulate_problem_and_queries():
     query = st.session_state.input_query.strip()
     doc_text = st.session_state.current_doc_text[:300000]
     
-    # Инструкция для LLM
     prompt = f"""
     Вы - эксперт по решению проблем. Проанализируйте запрос пользователя и документ (если есть):
     
@@ -155,7 +153,7 @@ def formulate_problem_and_queries():
     Ваши задачи:
     1. Сформулируйте ключевую проблему
     2. Проведите рассуждения (внутренний диалог: вопросы, возражения, сомнения самому себе и ответы)
-    3. Создайте на основе рассуждений, исходного запроса {query} и контекста {doc_text}  список СТРОГО из 5 поисковых запросов, расширяющих контекст и углубляющих исследование, для сбора информации
+    3. Создайте на основе рассуждений, исходного запроса {query} и контекста {doc_text} список СТРОГО из 5 поисковых запросов
     4. Примените First Principles Thinking и System 2 Thinking
     
     Требования:
@@ -167,7 +165,7 @@ def formulate_problem_and_queries():
         2. [ЗАПРОС 2]
         3. [ЗАПРОС 3]
         4. [ЗАПРОС 4]
-        5. [ЗАПРОС 6]
+        5. [ЗАПРОС 5]
     - Каждый запрос должен быть самодостаточным для поиска
     """
     
@@ -183,12 +181,10 @@ def formulate_problem_and_queries():
         
         result = response.text
         
-        # Парсинг результатов
         problem = ""
         internal_dialog = ""
         queries = []
         
-        # Пытаемся распарсить структурированный ответ
         if "ПРОБЛЕМА:" in result:
             problem_part = result.split("ПРОБЛЕМА:")[1]
             if "РАССУЖДЕНИЯ:" in problem_part:
@@ -197,27 +193,14 @@ def formulate_problem_and_queries():
                 if "ЗАПРОСЫ:" in internal_dialog_part:
                     internal_dialog = internal_dialog_part.split("ЗАПРОСЫ:")[0].strip()
                     queries_part = internal_dialog_part.split("ЗАПРОСЫ:")[1]
-                    # Извлекаем запросы по нумерованному списку
-                    for line in queries_part.split('\n'):
-                        if line.strip() and line.strip()[0].isdigit():
-                            # Убираем номер и точку
-                            query_text = line.split('.', 1)[1].strip() if '. ' in line else line.strip()
-                            queries.append(query_text)
-            else:
-                # Пытаемся извлечь только проблему и запросы
-                if "ЗАПРОСЫ:" in problem_part:
-                    problem = problem_part.split("ЗАПРОСЫ:")[0].strip()
-                    queries_part = problem_part.split("ЗАПРОСЫ:")[1]
                     for line in queries_part.split('\n'):
                         if line.strip() and line.strip()[0].isdigit():
                             query_text = line.split('.', 1)[1].strip() if '. ' in line else line.strip()
                             queries.append(query_text)
         
-        # Если не удалось распарсить, возвращаем как есть
         if not problem:
             problem = result
         if not queries:
-            # Попробуем найти запросы в последних строках
             last_lines = result.split('\n')[-10:]
             for line in last_lines:
                 if line.strip() and line.strip()[0].isdigit() and '.' in line:
@@ -228,7 +211,7 @@ def formulate_problem_and_queries():
         
         st.session_state.problem_formulation = problem
         st.session_state.internal_dialog = internal_dialog
-        st.session_state.generated_queries = queries[:5]  # ограничиваем 5 запросами
+        st.session_state.generated_queries = queries[:5]
         
         return result, queries
         
@@ -266,11 +249,10 @@ def apply_cognitive_method(method_name, context):
     except Exception as e:
         return f"Ошибка при применении {method_name}: {str(e)}"
 
-
 def generate_refinement_queries(context: str) -> List[str]:
     """Генерирует уточняющие поисковые запросы на основе контекста"""
     prompt = f"""
-    На основе проведенного анализа сформулируйте 3 уточняющих поисковых запроса, 
+    На основе проведенного анализа сформулируйте 3 уточняющих поисковых запросы, 
     которые помогут проверить гипотезы и углубить понимание решения:
     
     {context[:30000]}
@@ -295,22 +277,17 @@ def generate_refinement_queries(context: str) -> List[str]:
         )
         result = response.text
         
-        # Парсинг результатов
         queries = []
         for line in result.split('\n'):
             if line.strip() and line.strip()[0].isdigit():
                 query_text = line.split('.', 1)[1].strip() if '. ' in line else line.strip()
                 queries.append(query_text)
         
-        return queries[:3]  # возвращаем не более 3 запросов
+        return queries[:3]
         
     except Exception as e:
         st.error(f"Ошибка при генерации уточняющих запросов: {str(e)}")
         return []
-
-
-
-
 
 def generate_final_conclusions(context):
     """Генерирует итоговые выводы"""
@@ -354,8 +331,6 @@ def generate_response():
     except Exception as e:
         st.error(f"Сетевая ошибка: {str(e)}")
 
-    
-
     try:
         query = st.session_state.input_query.strip()
         if not query:
@@ -377,14 +352,13 @@ def generate_response():
             st.subheader("Полный вывод LLM")
             st.code(problem_result, language='text')
         
-        # Сохраняем для отчета
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
         if hasattr(st.session_state, 'internal_dialog'):
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
 
-        # Этап 2: Поиск информации
+        # Этап 2: Поиск информации (используется в контексте, но не добавляется в отчет)
         status_area.info("🔍 Выполняю поиск информации...")
         all_search_results = ""
         
@@ -392,19 +366,9 @@ def generate_response():
             try:
                 clean_query = search_query.replace('"', '').strip()
                 search_result_list = searcher.perform_search(clean_query, max_results=3, full_text=True)
-                # Используем созданный экземпляр WebSearcher
-                #search_result_list = searcher.perform_search(
-                    #search_query,
-                    #max_results=3,
-                    #full_text=True
-                #)
-            
-            
                 
-                # Форматируем результаты
                 formatted_results = []
                 for j, r in enumerate(search_result_list, 1):
-                    # Используем полный контент если он есть, иначе сниппет
                     content = r.get('full_content', r.get('snippet', ''))
                     formatted_results.append(
                         f"Результат {j}: {r.get('title', '')}\n"
@@ -412,13 +376,9 @@ def generate_response():
                         f"URL: {r.get('url', '')}\n"
                     )
 
-
-                
-                
                 search_result_str = "\n\n".join(formatted_results)
                 all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
                 
-                # Показываем результаты в сайдбаре
                 if not search_result_list:
                     st.warning(f"Нет результатов для: '{search_query}'")
                     continue
@@ -428,32 +388,20 @@ def generate_response():
                     st.error(f"Ошибка поиска: {error_msg}")
                     continue
 
-                
                 st.sidebar.subheader(f"Результаты по запросу: '{search_query}'")
                 for j, r in enumerate(search_result_list, 1):
                     title = r.get('title', 'Без названия')
                     url = r.get('url', '')
                     snippet = r.get('snippet', '')
-    
-               # Проверка и форматирование URL
+
                     if url and not url.startswith('http'):
                         url = 'https://' + url
-    
+
                     st.sidebar.subheader(f"🔍 {title}")
                     if url:
                         st.sidebar.markdown(f"[{url}]({url})")
                     if snippet:
                         st.sidebar.write(snippet[:300] + ('...' if len(snippet) > 300 else ''))
-
-                    st.sidebar.subheader(f"🔍 {title}")
-                    if url:
-                        st.sidebar.markdown(f"[{url}]({url})")
-
-                        # Кнопка для показа полного контента
-                    #if st.sidebar.button(f"Показать полный текст", key=f"full_{i}_{j}"):
-                        #st.sidebar.text_area(f"Полный текст: {full_content}", 
-                                             #value=content[:1000], 
-                                             #height=300)
                 
             except Exception as e:
                 st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
@@ -463,15 +411,8 @@ def generate_response():
         
         with st.expander("🔍 Результаты поиска", expanded=False):
             st.text(all_search_results[:10000] + ("..." if len(all_search_results) > 10000 else ""))
-
-
-
-
-
         
-        full_report += f"### Результаты поиска ###\n\n{all_search_results}\n\n"
-        
-        # Контекст для следующих этапов
+        # Контекст для следующих этапов (включает результаты поиска)
         context = (
             f"Проблема: {st.session_state.problem_formulation}\n"
             f"Исходный запрос: {query}\n"
@@ -482,10 +423,7 @@ def generate_response():
         # Этап 3: Применение когнитивных методик
         status_area.info("⚙️ Применяю когнитивные методики...")
         
-        # Всегда применяем основные методики
         all_methods = CORE_METHODS.copy()
-        
-        # Добавляем выбранные дополнительные методики
         if st.session_state.selected_methods:
             all_methods += [m for m in st.session_state.selected_methods if m not in CORE_METHODS]
         
@@ -509,15 +447,11 @@ def generate_response():
                 full_report += f"### Ошибка при применении {method}: {str(e)}\n\n"
             
             time.sleep(1)
-#####################
-
         
-
-        # Этап 4: Уточняющий поиск
+        # Этап 4: Уточняющий поиск (используется в контексте, но не добавляется в отчет)
         status_area.info("🔍 Выполняю уточняющий поиск...")
         refinement_search_results = ""
     
-        # Генерация уточняющих запросов
         refinement_context = (
             f"Проблема: {st.session_state.problem_formulation}\n"
             f"Анализ методик: {' '.join(method_results.values())[:10000]}\n"
@@ -526,17 +460,15 @@ def generate_response():
         refinement_queries = generate_refinement_queries(refinement_context)
     
         if refinement_queries:
-            if refinement_queries:
-                st.sidebar.subheader("🔎 Уточняющие запросы")
-                for i, query in enumerate(refinement_queries):
-                    st.sidebar.write(f"{i+1}. {query}")
-            # Выполнение уточняющего поиска
+            st.sidebar.subheader("🔎 Уточняющие запросы")
+            for i, query in enumerate(refinement_queries):
+                st.sidebar.write(f"{i+1}. {query}")
+            
             for i, query in enumerate(refinement_queries):
                 try:
                     clean_query = query.replace('"', '').strip()
                     search_results = searcher.perform_search(clean_query, max_results=2, full_text=True)
                 
-                    # Форматирование результатов
                     formatted = []
                     for j, r in enumerate(search_results, 1):
                         content = r.get('full_content', r.get('snippet', ''))
@@ -552,17 +484,14 @@ def generate_response():
                 except Exception as e:
                     refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
     
-        # Добавляем результаты в отчет
-        full_report += f"### Уточняющий поиск ###\n\n{refinement_search_results}\n\n"
-    
-        # Обновляем контекст для финальных выводов
+        # Обновляем контекст для финальных выводов (включая уточняющий поиск)
         final_context = f"{context}\n\nРезультаты уточняющего поиска:\n{refinement_search_results}"
     
-        # Этап 5: Итоговые выводы (с обновленным контекстом)
+        # Этап 5: Итоговые выводы
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
         try:
-            conclusions = generate_final_conclusions(final_context)  # <-- используем обновленный контекст
+            conclusions = generate_final_conclusions(final_context)
             
             with st.expander("📝 Итоговые выводы", expanded=True):
                 st.write(conclusions)
@@ -572,12 +501,12 @@ def generate_response():
             st.error(f"Ошибка при генерации выводов: {str(e)}")
             full_report += f"### Ошибка при генерации выводов: {str(e)}\n\n"
         
-        # Сохраняем полный отчет
+        # Сохраняем полный отчет (без результатов поиска)
         st.session_state.report_content = full_report
         progress_bar.progress(100)
         status_area.success("✅ Обработка завершена!")
         
-        # Показываем полный отчет
+        # Показываем полный отчет (без результатов поиска)
         st.divider()
         st.subheader("Полный отчет")
         st.text(full_report[:30000] + ("..." if len(full_report) > 30000 else ""))
@@ -589,7 +518,6 @@ def generate_response():
         st.session_state.processing = False
 
 # Интерфейс Streamlit
-# --- Боковая панель ---
 with st.sidebar:
     st.title("Troubleshooter")
     st.subheader("Решатель проблем")
@@ -601,7 +529,7 @@ with st.sidebar:
         key="selected_methods"
     )
 
-# --- Основная область ---
+# Основная область
 st.title("Troubleshooter - Решатель проблем")
 st.subheader("Решение проблем с применением когнитивных методов")
 
@@ -631,7 +559,7 @@ if uploaded_file:
 if st.button("Сгенерировать отчет", disabled=st.session_state.processing):
     generate_response()
 
-# --- Экспорт результатов ---
+# Экспорт результатов
 if st.session_state.report_content and not st.session_state.processing:
     st.divider()
     st.subheader("Экспорт результатов")
