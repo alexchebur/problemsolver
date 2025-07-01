@@ -405,7 +405,7 @@ def generate_response():
                         # Кнопка для показа полного контента
                     if st.sidebar.button(f"Показать полный текст", key=f"full_{i}_{j}"):
                         st.sidebar.text_area(f"Полный текст: {title}", 
-                                             value=content[:5000], 
+                                             value=content[:1000], 
                                              height=300)
                 
             except Exception as e:
