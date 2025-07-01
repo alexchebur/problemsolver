@@ -403,10 +403,10 @@ def generate_response():
                         st.sidebar.markdown(f"[{url}]({url})")
 
                         # Кнопка для показа полного контента
-                    if st.sidebar.button(f"Показать полный текст", key=f"full_{i}_{j}"):
-                        st.sidebar.text_area(f"Полный текст: {full_content}", 
-                                             value=content[:1000], 
-                                             height=300)
+                    #if st.sidebar.button(f"Показать полный текст", key=f"full_{i}_{j}"):
+                        #st.sidebar.text_area(f"Полный текст: {full_content}", 
+                                             #value=content[:1000], 
+                                             #height=300)
                 
             except Exception as e:
                 st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
