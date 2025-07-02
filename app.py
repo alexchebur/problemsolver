@@ -207,7 +207,7 @@ def apply_cognitive_method(method_name, context):
     - Сформулируйте выводы и решения
     - Ответ должен быть не менее 9000 символов
     - Используйте строгий анализ, избегайте общих фраз
-    - Для процессов и потоков пишите код визуализаций в формате Mermaid, СТРОГО код, начинающийся с пометки вида [```mermaid], СТРОГО вертикальной ориентации [direction TB - top to bottom]
+    - Для процессов и потоков пишите код визуализаций в формате Mermaid, СТРОГО код, начинающийся с пометки вида [```mermaid], СТРОГО вертикальной ориентации direction TB - top to bottom
     """
     
     try:
@@ -549,7 +549,7 @@ uploaded_file = st.file_uploader(
 if uploaded_file:
     parse_docx(uploaded_file)
 
-if st.button("Сгенерировать отчет", disabled=st.session_state.processing):
+if st.button("Сгенерировать решение", disabled=st.session_state.processing):
     generate_response()
 
 if st.session_state.report_content and not st.session_state.processing:
