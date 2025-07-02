@@ -209,15 +209,15 @@ def convert_md_to_html(md_text: str) -> str:
     
     def mermaid_replacer(match):
         mermaid_code = match.group(1).strip()
-        # Удаляем лишние символы в начале и конце
-        mermaid_code = re.sub(r'^[\n\s\[\]]+', '', mermaid_code)
-        mermaid_code = re.sub(r'[\n\s\[\]]+$', '', mermaid_code)
-        # Исправляем экранирование
-        mermaid_code = mermaid_code.replace("&amp;", "&")
+        # Удаляем все HTML-теги
+        mermaid_code = re.sub(r'<[^>]+>', '', mermaid_code)
+        # Удаляем лишние пробелы
+        mermaid_code = re.sub(r'\s+', ' ', mermaid_code)
         mermaid_blocks.append(mermaid_code)
-        return placeholder_pattern.format(len(mermaid_blocks) - 1)
+        # Возвращаем плейсхолдер с переносами
+        return f"\n\n{placeholder_pattern.format(len(mermaid_blocks) - 1)}\n\n"
     
-    # Временная замена блоков Mermaid на плейсхолдеры
+    # Временная замена блоков Mermaid
     md_text = re.sub(
         r'```mermaid\s*(.*?)```', 
         mermaid_replacer, 
@@ -225,33 +225,25 @@ def convert_md_to_html(md_text: str) -> str:
         flags=re.DOTALL
     )
     
-    # Конвертация Markdown в HTML с расширениями
+    # Конвертация Markdown в HTML
     html_content = markdown.markdown(
         md_text,
         extensions=[
-            'extra',          # Поддержка таблиц, аббревиатур, определений
-            'codehilite',     # Подсветка кода
-            'fenced_code',    # Блоки кода с указанием языка
-            'tables',         # Улучшенные таблицы
-            'attr_list',      # Добавление атрибутов к элементам
-            'md_in_html',     # Разрешение Markdown внутри HTML
-            'nl2br',          # Автоматический перенос строк
-            'sane_lists',     # Улучшенные списки
-            'toc'             # Оглавление
+            'extra', 'codehilite', 'fenced_code', 
+            'tables', 'attr_list', 'md_in_html',
+            'nl2br', 'sane_lists', 'toc'
         ],
         output_format='html5'
     )
     
     # Восстановление блоков Mermaid
     for i, block in enumerate(mermaid_blocks):
-        # Проверка и исправление синтаксиса диаграмм
         fixed_block = fix_mermaid_syntax(block)
-        
         mermaid_div = f"""
         <div class="diagram-wrapper">
             <div class="mermaid-container">
                 <div class="mermaid" id="mermaid-{i}">
-                    {fixed_block}
+                    {html.escape(fixed_block)}
                 </div>
                 <div id="mermaid-error-mermaid-{i}"></div>
             </div>
@@ -263,36 +255,53 @@ def convert_md_to_html(md_text: str) -> str:
         )
     
     return html_content
-
+    
 def fix_mermaid_syntax(mermaid_code: str) -> str:
-    """Исправляет распространенные синтаксические ошибки в диаграммах Mermaid"""
+    """Исправляет синтаксические ошибки в диаграммах Mermaid"""
     # 1. Удаление лишних символов в начале и конце
     code = mermaid_code.strip()
     
-    # 2. Замена некорректных символов
-    code = code.replace("&amp;", "&")
-    code = code.replace("&lt;", "<")
-    code = code.replace("&gt;", ">")
+    # 2. Удаление точек с запятой в конце строк
+    code = re.sub(r';\s*$', '', code, flags=re.MULTILINE)
     
-    # 3. Удаление лишних квадратных скобок
-    code = re.sub(r'^[\[\]]+', '', code)
-    code = re.sub(r'[\[\]]+$', '', code)
+    # 3. Замена специальных символов в тексте узлов
+    code = re.sub(r'(["\]])', r'\\\1', code)  # Экранирование специальных символов
     
-    # 4. Проверка ориентации диаграммы
+    # 4. Замена кавычек в тексте на одинарные и экранирование
+    code = re.sub(r'"(.*?)"', r"'\1'", code)
+    
+    # 5. Исправление стрелок с текстом
+    code = re.sub(r'--\s*(.*?)\s*-->', r'--> |\1|', code)
+    
+    # 6. Обработка номеров событий
+    code = code.replace("№", "#")
+    
+    # 7. Разделение длинных текстов на несколько строк
+    def split_long_text(match):
+        text = match.group(1)
+        words = text.split()
+        if len(words) > 5:
+            # Разбиваем текст на части по 5 слов
+            parts = [words[i:i+5] for i in range(0, len(words), 5)]
+            return '"' + '\\n'.join([' '.join(part) for part in parts]) + '"'
+        return f'"{text}"'
+    
+    code = re.sub(r'\["(.+?)"\]', split_long_text, code)
+    
+    # 8. Упрощение сложных узлов
+    code = re.sub(
+        r'(\w+)\["(.{30,})"\]', 
+        r'\1["\2"]\nstyle \1 width:300px,height:80px',
+        code
+    )
+    
+    # 9. Добавление ориентации по умолчанию
     if not re.search(r'^\s*(graph|flowchart)\s+[A-Z]{2}', code):
         if "graph" in code or "flowchart" in code:
-            # Автоматическое определение ориентации
-            if "LR" not in code and "TB" not in code and "BT" not in code and "RL" not in code:
-                code = re.sub(r'(graph|flowchart)\s+', r'\1 LR\n', code)
+            code = re.sub(r'(graph|flowchart)\s+', r'\1 TD\n', code)
     
-    # 5. Проверка синтаксиса узлов
-    code = re.sub(r'(\w+)\[([^\]]+)\]', r'\1["\2"]', code)
-    
-    # 6. Проверка стрелок
-    code = re.sub(r'--+>', '-->', code)
-    code = re.sub(r'&amp;&amp;>', '&&>', code)
-    
-    # 7. Удаление лишних точек с запятой
-    code = re.sub(r';\s*;+', ';', code)
+    # 10. Удаление лишних пробелов
+    code = re.sub(r'\s+', ' ', code)
+    code = re.sub(r'(\S)\s+(\S)', r'\1 \2', code)
     
     return code
