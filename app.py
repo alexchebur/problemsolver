@@ -604,9 +604,9 @@ def generate_response():
         status_area.success("✅ Обработка завершена!")
         
         # Показываем полный отчет (без результатов поиска)
-        st.divider()
-        st.subheader("Полный отчет")
-        st.text(full_report[:30000] + ("..." if len(full_report) > 30000 else ""))
+        #st.divider()
+        #st.subheader("Полный отчет")
+        #st.text(full_report[:30000] + ("..." if len(full_report) > 30000 else ""))
 
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
