@@ -408,14 +408,13 @@ def generate_response():
         
         # Вывод рассуждений в боковую панель
         if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
-            with st.sidebar.expander("🧠 Рассуждения ИИ", expanded=True):
-                st.subheader("Ход мыслей")
-                st.text_area(
-                    "",
-                    value=st.session_state.internal_dialog,
-                    height=300,
-                    label_visibility="collapsed"
-                )
+            st.sidebar.subheader("🧠 Рассуждения ИИ")
+            st.sidebar.text_area(
+                "",
+                value=st.session_state.internal_dialog,
+                height=300,
+                label_visibility="collapsed"
+            )
         else:
             st.sidebar.warning("Рассуждения не были сгенерированы")
         
@@ -427,9 +426,9 @@ def generate_response():
             st.subheader("Сгенерированные поисковые запросы")
             st.write(queries)
             
-            # Полный вывод LLM
-            with st.expander("📄 Полный вывод LLM", expanded=False):
-                st.code(problem_result, language='text')
+            # Полный вывод LLM (без вложенного expander)
+            st.subheader("Полный вывод LLM")
+            st.code(problem_result, language='text')
         
         # Формирование отчета
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
@@ -459,21 +458,22 @@ def generate_response():
                 search_result_str = "\n\n".join(formatted_results)
                 all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
                 
-                # Показ результатов в боковой панели
-                with st.sidebar.expander(f"🔍 Результаты по запросу: '{search_query}'", expanded=False):
-                    for j, r in enumerate(search_result_list, 1):
-                        title = r.get('title', 'Без названия')
-                        url = r.get('url', '')
-                        snippet = r.get('snippet', '')
+                # Показ результатов в боковой панели (без вложенных expanders)
+                st.sidebar.subheader(f"🔍 Результаты по запросу: '{search_query}'")
+                for j, r in enumerate(search_result_list, 1):
+                    title = r.get('title', 'Без названия')
+                    url = r.get('url', '')
+                    snippet = r.get('snippet', '')
 
-                        if url and not url.startswith('http'):
-                            url = 'https://' + url
+                    if url and not url.startswith('http'):
+                        url = 'https://' + url
 
-                        st.subheader(f"{j}. {title}")
-                        if url:
-                            st.markdown(f"[{url}]({url})")
-                        if snippet:
-                            st.write(snippet[:300] + ('...' if len(snippet) > 300 else ''))
+                    st.sidebar.markdown(f"**{j}. {title}**")
+                    if url:
+                        st.sidebar.markdown(f"[{url}]({url})")
+                    if snippet:
+                        st.sidebar.caption(snippet[:300] + ('...' if len(snippet) > 300 else ''))
+                    st.sidebar.write("---")
                 
             except Exception as e:
                 st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
@@ -507,8 +507,9 @@ def generate_response():
                 result = apply_cognitive_method(method, context)
                 method_results[method] = result
                 
-                with st.expander(f"✅ {method}", expanded=False):
-                    st.code(result, language='text')
+                # Отображаем результат метода без вложенного expander
+                st.subheader(f"✅ {method}")
+                st.text_area("", value=result, height=300, label_visibility="collapsed")
                 
                 full_report += f"### Методика: {method} ###\n\n{result}\n\n"
             except Exception as e:
@@ -529,9 +530,9 @@ def generate_response():
         refinement_queries = generate_refinement_queries(refinement_context)
     
         if refinement_queries:
-            with st.sidebar.expander("🔎 Уточняющие запросы", expanded=False):
-                for i, query in enumerate(refinement_queries):
-                    st.write(f"{i+1}. {query}")
+            st.sidebar.subheader("🔎 Уточняющие запросы")
+            for i, query in enumerate(refinement_queries):
+                st.sidebar.write(f"{i+1}. {query}")
             
             for i, query in enumerate(refinement_queries):
                 try:
@@ -572,8 +573,8 @@ def generate_response():
                 analysis_context=analysis_context
             )
             
-            with st.expander("📝 Итоговые выводы", expanded=True):
-                st.write(conclusions)
+            st.subheader("📝 Итоговые выводы")
+            st.text_area("", value=conclusions, height=400, label_visibility="collapsed")
             
             full_report += f"### Итоговые выводы ###\n\n{conclusions}\n\n"
         except Exception as e:
