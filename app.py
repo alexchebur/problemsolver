@@ -161,61 +161,12 @@ def create_pdf(content, title="Отчет"):
         pdf.ln(8)
         
         # Обработка контента
-        paragraphs = re.split(r'\n\s*\n', content)  # Разделение на параграфы
-
+        clean_content = re.sub(r'```mermaid.*?```', '', content, flags=re.DOTALL)
+        paragraphs = re.split(r'\n\s*\n', clean_content)
+        
         #if '```mermaid' in content:
             #add_mermaid_diagrams_to_pdf(pdf, content)
-        for para in paragraphs:
-            # Проверяем, является ли параграф блоком Mermaid
-            is_mermaid = para.strip().startswith('```mermaid')
-            if is_mermaid:
-                # Извлекаем идентификатор блока
-                mermaid_id = None
-                for key, value in mermaid_images.items():
-                    if value["code"] in para:
-                        mermaid_id = key
-                        break
-                
-                if mermaid_id:
-                    img_data = mermaid_images[mermaid_id]["image"]
-                    img_size = mermaid_images[mermaid_id]["size"]
-                    
-                    # Рассчитываем размеры для вписывания в страницу
-                    max_width = pdf.w - 20
-                    max_height = pdf.h - 50
-                    
-                    # Сохраняем пропорции
-                    width_ratio = max_width / img_size[0]
-                    height_ratio = max_height / img_size[1]
-                    ratio = min(width_ratio, height_ratio)
-                    
-                    # Убедимся, что изображение не будет слишком маленьким
-                    if ratio < 0.1:
-                        ratio = 0.1
-                    
-                    new_width = img_size[0] * ratio
-                    new_height = img_size[1] * ratio
-                    
-                    # Позиционируем по центру
-                    x = (pdf.w - new_width) / 2
-                    y = (pdf.h - new_height) / 2
-                    
-                    # Создаем временный файл для изображения
-                    with tempfile.NamedTemporaryFile(delete=True, suffix=".png") as tmp_file:
-                        tmp_file.write(base64.b64decode(img_data))
-                        tmp_file.flush()
-                        
-                        pdf.add_page()
-                        pdf.image(tmp_file.name, x=x, y=y, w=new_width)
-                    
-                    # Добавляем исходный код диаграммы
-                    pdf.add_page()
-                    set_font('normal', 8)
-                    pdf.multi_cell(0, 4, txt=f"```mermaid\n{mermaid_images[mermaid_id]['code']}\n```")
-                    pdf.ln(5)
-                    
-                continue
-                
+        for para in paragraphs:    
             para = clean_markdown(para)
             if not para:
                 pdf.ln(5)
@@ -248,6 +199,43 @@ def create_pdf(content, title="Отчет"):
             
             pdf.ln(3)
         
+        # Вставляем диаграммы в конец документа
+        from mermaid import process_mermaid_diagrams
+        mermaid_images = process_mermaid_diagrams(content)
+        
+        for key, value in mermaid_images.items():
+            img_data = value["image"]
+            img_size = value["size"]
+            
+            # Рассчитываем размеры для вписывания в страницу
+            max_width = pdf.w - 20
+            max_height = pdf.h - 50
+            
+            # Сохраняем пропорции
+            width_ratio = max_width / img_size[0]
+            height_ratio = max_height / img_size[1]
+            ratio = min(width_ratio, height_ratio)
+            
+            # Убедимся, что изображение не будет слишком маленьким
+            if ratio < 0.1:
+                ratio = 0.1
+            
+            new_width = img_size[0] * ratio
+            new_height = img_size[1] * ratio
+            
+            # Позиционируем по центру
+            x = (pdf.w - new_width) / 2
+            y = (pdf.h - new_height) / 2
+            
+            # Создаем временный файл для изображения
+            with tempfile.NamedTemporaryFile(delete=True, suffix=".png") as tmp_file:
+                tmp_file.write(base64.b64decode(img_data))
+                tmp_file.flush()
+                
+                pdf.add_page()
+                pdf.image(tmp_file.name, x=x, y=y, w=new_width)
+        
+
         buffer = BytesIO()
         pdf.output(buffer)
         return buffer.getvalue()
