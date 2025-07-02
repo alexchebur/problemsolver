@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
 from typing import List, Tuple
 import re
-from mermaid import add_mermaid_diagrams_to_pdf 
+#from mermaid import add_mermaid_diagrams_to_pdf 
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
