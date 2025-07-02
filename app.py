@@ -139,10 +139,11 @@ def create_pdf(content, title="Отчет"):
         # Настройки документа
         pdf.set_auto_page_break(auto=True, margin=15)
         effective_width = pdf.w - 2*pdf.l_margin
-        from mermaid import process_mermaid_diagrams
-        mermaid_images = process_mermaid_diagrams(content)
+        
         # Улучшенная очистка Markdown
         def clean_markdown(text):
+            # Удаляем блоки Mermaid
+            text = re.sub(r'```mermaid.*?```', '', text, flags=re.DOTALL)
             replacements = [
                 (r'#{1,3}\s*', ''),      # Заголовки
                 (r'\*{2}(.*?)\*{2}', r'\1'),  # Жирный
@@ -161,13 +162,11 @@ def create_pdf(content, title="Отчет"):
         pdf.ln(8)
         
         # Обработка контента
-        clean_content = re.sub(r'```mermaid.*?```', '', content, flags=re.DOTALL)
-        paragraphs = re.split(r'\n\s*\n', clean_content)
-        
-        #if '```mermaid' in content:
-            #add_mermaid_diagrams_to_pdf(pdf, content)
-        for para in paragraphs:    
-            para = clean_markdown(para)
+        content = clean_markdown(content)  # Очищаем от Markdown и блоков Mermaid
+        paragraphs = re.split(r'\n\s*\n', content)  # Разделение на параграфы
+
+        for para in paragraphs:
+            para = para.strip()
             if not para:
                 pdf.ln(5)
                 continue
@@ -199,43 +198,53 @@ def create_pdf(content, title="Отчет"):
             
             pdf.ln(3)
         
-        # Вставляем диаграммы в конец документа
+        # Добавляем диаграммы Mermaid в конец документа
         from mermaid import process_mermaid_diagrams
         mermaid_images = process_mermaid_diagrams(content)
         
-        for key, value in mermaid_images.items():
-            img_data = value["image"]
-            img_size = value["size"]
+        if mermaid_images:
+            pdf.add_page()
+            set_font('bold', 14)
+            pdf.cell(0, 10, txt="Диаграммы Mermaid", ln=1, align='C')
+            pdf.ln(8)
             
-            # Рассчитываем размеры для вписывания в страницу
-            max_width = pdf.w - 20
-            max_height = pdf.h - 50
-            
-            # Сохраняем пропорции
-            width_ratio = max_width / img_size[0]
-            height_ratio = max_height / img_size[1]
-            ratio = min(width_ratio, height_ratio)
-            
-            # Убедимся, что изображение не будет слишком маленьким
-            if ratio < 0.1:
-                ratio = 0.1
-            
-            new_width = img_size[0] * ratio
-            new_height = img_size[1] * ratio
-            
-            # Позиционируем по центру
-            x = (pdf.w - new_width) / 2
-            y = (pdf.h - new_height) / 2
-            
-            # Создаем временный файл для изображения
-            with tempfile.NamedTemporaryFile(delete=True, suffix=".png") as tmp_file:
-                tmp_file.write(base64.b64decode(img_data))
-                tmp_file.flush()
+            for key, value in mermaid_images.items():
+                img_data = value["image"]
+                img_size = value["size"]
                 
-                pdf.add_page()
-                pdf.image(tmp_file.name, x=x, y=y, w=new_width)
+                # Рассчитываем размеры для вписывания в страницу
+                max_width = pdf.w - 20
+                max_height = pdf.h - 50
+                
+                # Сохраняем пропорции
+                width_ratio = max_width / img_size[0]
+                height_ratio = max_height / img_size[1]
+                ratio = min(width_ratio, height_ratio)
+                
+                # Убедимся, что изображение не будет слишком маленьким
+                if ratio < 0.1:
+                    ratio = 0.1
+                
+                new_width = img_size[0] * ratio
+                new_height = img_size[1] * ratio
+                
+                # Позиционируем по центру
+                x = (pdf.w - new_width) / 2
+                y = (pdf.h - new_height) / 2
+                
+                # Создаем временный файл для изображения
+                with tempfile.NamedTemporaryFile(delete=True, suffix=".png") as tmp_file:
+                    tmp_file.write(base64.b64decode(img_data))
+                    tmp_file.flush()
+                    
+                    pdf.image(tmp_file.name, x=x, y=y, w=new_width)
+                
+                # Добавляем описание диаграммы
+                set_font('normal', 10)
+                pdf.ln(new_height + 5)
+                pdf.cell(0, 6, txt=f"Диаграмма {key}", ln=1)
+                pdf.ln(5)
         
-
         buffer = BytesIO()
         pdf.output(buffer)
         return buffer.getvalue()
