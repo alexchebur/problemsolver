@@ -554,14 +554,21 @@ def generate_response():
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
         try:
+            # Формируем контекст только из анализа методик
+            analysis_context = (
+                f"Проблема: {st.session_state.problem_formulation}\n"
+                f"Анализ методик:\n"
+                + "\n\n".join([f"{method}:\n{result}" for method, result in method_results.items()])
+            )
+    
             conclusions = generate_final_conclusions(
                 problem_formulation=st.session_state.problem_formulation,
-                analysis_context="\n".join(method_results.values())  # Только результаты анализа методик
+                analysis_context=analysis_context
             )
-            
+    
             with st.expander("📝 Итоговые выводы", expanded=True):
                 st.write(conclusions)
-            
+    
             full_report += f"### Итоговые выводы ###\n\n{conclusions}\n\n"
         except Exception as e:
             st.error(f"Ошибка при генерации выводов: {str(e)}")
