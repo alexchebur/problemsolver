@@ -98,6 +98,9 @@ def parse_docx(uploaded_file):
 
 def create_pdf(content, title="Отчет"):
     try:
+        # Сохраняем оригинальный контент для извлечения диаграмм
+        original_content = content
+        
         pdf = FPDF()
         pdf.add_page()
         
@@ -162,8 +165,8 @@ def create_pdf(content, title="Отчет"):
         pdf.ln(8)
         
         # Обработка контента
-        content = clean_markdown(content)  # Очищаем от Markdown и блоков Mermaid
-        paragraphs = re.split(r'\n\s*\n', content)  # Разделение на параграфы
+        cleaned_content = clean_markdown(content)  # Очищаем от Markdown и блоков Mermaid
+        paragraphs = re.split(r'\n\s*\n', cleaned_content)  # Разделение на параграфы
 
         for para in paragraphs:
             para = para.strip()
@@ -200,7 +203,7 @@ def create_pdf(content, title="Отчет"):
         
         # Добавляем диаграммы Mermaid в конец документа
         from mermaid import process_mermaid_diagrams
-        mermaid_images = process_mermaid_diagrams(content)
+        mermaid_images = process_mermaid_diagrams(original_content)  # Используем оригинальный контент
         
         if mermaid_images:
             pdf.add_page()
@@ -253,7 +256,7 @@ def create_pdf(content, title="Отчет"):
         st.error(f"🚨 Ошибка при создании PDF: {str(e)}")
         traceback.print_exc()
         return None
-
+        
 def formulate_problem_and_queries():
     """Этап 1: Формулирование проблемы и генерация поисковых запросов"""
     query = st.session_state.input_query.strip()
