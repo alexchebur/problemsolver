@@ -3,13 +3,12 @@
    python-docx
    fpdf2
    markdown2
-   duckduckgo_search
    fake-useragent
    beautifulsoup4==4.12.3
    requests==2.32.0
-   brave-search
    tenacity
    googlesearch-python
    pyppeteer
    pillow
+   cairosvg
 
