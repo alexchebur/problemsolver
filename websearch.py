@@ -25,8 +25,9 @@ class GoogleCSESearcher:
         self.api_key = "AIzaSyCNVeNmUgrt-kL5ZI4EkHFoTjTzRSWATX4"
         self.cse_id = "a4f17489c6a0a4414"  # Пример ID, замените на ваш
         
-        # Резервные методы поиска
+        # Резервные методы поиска (добавлен DuckDuckGo)
         self.fallback_searchers = [
+            self._search_duckduckgo,  # Первый резерв - DuckDuckGo
             self._search_google_organic,
             self._search_bing_ru
         ]
@@ -52,6 +53,12 @@ class GoogleCSESearcher:
                     results = searcher(query, max_results)
                     if results:
                         logger.info(f"Успешный поиск через {searcher.__name__}")
+                        
+                        # Добавляем полный текст для DuckDuckGo результатов
+                        if full_text:
+                            for item in results:
+                                item['full_content'] = self.get_full_page_content(item['url'])
+                        
                         return results
                 except Exception as e:
                     logger.warning(f"Ошибка в резервном поиске: {str(e)}")
@@ -62,6 +69,46 @@ class GoogleCSESearcher:
             return [{"error": f"Ошибка поиска: {str(e)}"}]
         finally:
             time.sleep(random.uniform(*self.delay_range))
+
+    def _search_duckduckgo(self, query: str, max_results: int) -> List[Dict]:
+        """Поиск через DuckDuckGo API (резервный метод)"""
+        try:
+            from duckduckpy import query as dd_query
+        except ImportError:
+            logger.warning("Библиотека duckduckpy не установлена. Пропуск DuckDuckGo.")
+            return []
+
+        try:
+            # Выполняем запрос в формате словаря
+            response = dd_query(query, container='dict')
+            results = []
+            
+            # Обрабатываем основные результаты
+            for item in response.get('results', [])[:max_results]:
+                if 'first_url' in item and 'text' in item:
+                    results.append({
+                        'title': item['text'][:100],
+                        'url': item['first_url'],
+                        'snippet': item['text'][:500]
+                    })
+            
+            # Обрабатываем связанные темы (если не набрали достаточно результатов)
+            if len(results) < max_results:
+                for item in response.get('related_topics', []):
+                    if 'first_url' in item and 'text' in item:
+                        results.append({
+                            'title': item['text'][:100],
+                            'url': item['first_url'],
+                            'snippet': item['text'][:500]
+                        })
+                        if len(results) >= max_results:
+                            break
+            
+            return results[:max_results]
+        
+        except Exception as e:
+            logger.error(f"Ошибка DuckDuckGo: {str(e)}")
+            return []
 
     def _search_google_cse(self, query: str, max_results: int) -> List[Dict]:
         """Поиск через Google Custom Search API"""
