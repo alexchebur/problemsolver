@@ -119,10 +119,15 @@ def process_mermaid_diagrams(content: str) -> dict:
             try:
                 img_path = os.path.join(tmp_dir, f"mermaid_{i}.png")
                 
+                # Создаем новый цикл событий для текущего потока
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
                 # Рендерим диаграмму в изображение
-                success = asyncio.get_event_loop().run_until_complete(
+                success = loop.run_until_complete(
                     render_mermaid_to_image(code, img_path)
                 )
+                loop.close()
                 
                 if not success or not os.path.exists(img_path):
                     logging.error(f"Не удалось создать изображение для диаграммы {i}")
