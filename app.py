@@ -400,41 +400,55 @@ def generate_response():
         if not query:
             status_area.warning("⚠️ Введите запрос")
             return
+def generate_response():
+    st.session_state.processing = True
+    st.session_state.report_content = None
+    status_area = st.empty()
+    progress_bar = st.progress(0)
+
+    try:
+        # ... существующий код до этапа 1 ...
 
         # Этап 1: Формулирование проблемы и генерация запросов
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
         problem_result, queries = formulate_problem_and_queries()
         
-        # Создаем контейнер для этапа 1
-        stage1_container = st.container()
-        with stage1_container:
-            with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
-                st.subheader("Сформулированная проблема")
-                st.write(st.session_state.problem_formulation)
-                
-                st.subheader("Сгенерированные поисковые запросы")
-                st.write(queries)
-                
-                with st.expander("📄 Полный вывод LLM", expanded=False):
-                    st.code(problem_result, language='text')
+        # Основной контейнер для этапа 1
+        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
+            st.subheader("Сформулированная проблема")
+            st.write(st.session_state.problem_formulation)
+            
+            st.subheader("Сгенерированные поисковые запросы")
+            st.write(queries)
+            
+            # Кнопка для отображения рассуждений в отдельном expander
+            if st.button("👁️ Показать рассуждения", key="show_reasoning_button"):
+                st.session_state.show_reasoning = True
+            
+            # Кнопка для полного вывода LLM
+            with st.expander("📄 Полный вывод LLM", expanded=False):
+                st.code(problem_result, language='text')
         
-        # Отдельный expander для рассуждений
-        with st.expander("🧠 Рассуждения и внутренний диалог", expanded=False):
-            if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
-                st.text_area(
-                    "Ход мыслей ИИ:",
-                    value=st.session_state.internal_dialog,
-                    height=300,
-                    label_visibility="collapsed"
-                )
-            else:
-                st.warning("Рассуждения не были сгенерированы")
-                st.info("Возможные причины:")
-                st.markdown("""
-                - LLM не следовала инструкциям структурирования вывода
-                - Проблема слишком простая для глубоких рассуждений
-                - Попробуйте переформулировать запрос или увеличить температуру
-                """)
+        # Отдельный expander для рассуждений (вне основного)
+        if st.session_state.get('show_reasoning', False):
+            with st.expander("🧠 Рассуждения и внутренний диалог ИИ", expanded=True):
+                if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
+                    st.text_area(
+                        "Ход мыслей:",
+                        value=st.session_state.internal_dialog,
+                        height=300,
+                        label_visibility="collapsed"
+                    )
+                else:
+                    st.warning("Рассуждения не были сгенерированы")
+                    st.info("""
+                    Это могло произойти по нескольким причинам:
+                    - LLM не следовала инструкциям по структурированию вывода
+                    - Проблема слишком проста для глубоких рассуждений
+                    - Попробуйте переформулировать запрос или увеличить температуру
+                    """)
+        
+        # ... остальной код без изменений ...
                 with st.expander("Технические детали", expanded=False):
                     st.code(problem_result, language='text')
         
