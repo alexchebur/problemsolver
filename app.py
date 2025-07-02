@@ -99,77 +99,98 @@ def create_pdf(content, title="Отчет"):
         pdf = FPDF()
         pdf.add_page()
         
-        # Настройка шрифтов (должны быть доступны в системе)
-        try:
-            pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
-            pdf.add_font('DejaVuB', '', 'fonts/DejaVuSansCondensed-Bold.ttf', uni=True)
-        except:
-            # Fallback к стандартным шрифтам, если DejaVu не доступен
-            pdf.add_font('Arial', '', 'arial.ttf', uni=True)
-            pdf.add_font('ArialB', '', 'arialbd.ttf', uni=True)
+        # Конфигурация шрифтов
+        FONT_DIR = "fonts/"
+        FONT_MAPPING = {
+            'normal': {
+                'builtin': 'Helvetica',
+                'custom': {'path': FONT_DIR+'DejaVuSansCondensed.ttf', 'name': 'DejaVu'}
+            },
+            'bold': {
+                'builtin': 'Helvetica-B',
+                'custom': {'path': FONT_DIR+'DejaVuSansCondensed-Bold.ttf', 'name': 'DejaVuB'}
+            }
+        }
+        
+        # Попытка загрузить кастомные шрифты
+        custom_fonts_available = True
+        for font_type in FONT_MAPPING.values():
+            try:
+                pdf.add_font(
+                    font_type['custom']['name'],
+                    '',
+                    font_type['custom']['path'],
+                    uni=True
+                )
+            except:
+                custom_fonts_available = False
+                break
+        
+        # Функция для установки шрифта
+        def set_font(style='normal', size=12):
+            if custom_fonts_available:
+                font_name = FONT_MAPPING[style]['custom']['name']
+            else:
+                font_name = FONT_MAPPING[style]['builtin']
+            pdf.set_font(font_name, '', size)
         
         # Настройки документа
         pdf.set_auto_page_break(auto=True, margin=15)
-        effective_page_width = pdf.w - 2*pdf.l_margin  # Ширина области текста
+        effective_width = pdf.w - 2*pdf.l_margin
         
-        # Функция для очистки Markdown
+        # Улучшенная очистка Markdown
         def clean_markdown(text):
-            # Удаляем заголовки Markdown
-            text = text.replace('### ', '').replace('## ', '').replace('# ', '')
-            # Удаляем жирное и курсивное выделение
-            text = text.replace('**', '').replace('__', '').replace('*', '').replace('_', '')
-            # Удаляем код и блоки кода
-            text = text.replace('`', '').replace('```', '')
+            replacements = [
+                (r'#{1,3}\s*', ''),      # Заголовки
+                (r'\*{2}(.*?)\*{2}', r'\1'),  # Жирный
+                (r'_{2}(.*?)_{2}', r'\1'),    # Подчеркивание
+                (r'`{1,3}(.*?)`{1,3}', r'\1'), # Код
+                (r'\[(.*?)\]\(.*?\)', r'\1'),  # Ссылки
+                (r'\s+', ' ')                  # Множественные пробелы
+            ]
+            for pattern, repl in replacements:
+                text = re.sub(pattern, repl, text)
             return text.strip()
         
         # Заголовок документа
-        pdf.set_font('DejaVuB' if 'DejaVuB' in pdf.fonts else 'ArialB', '', 16)
+        set_font('bold', 16)
         pdf.cell(0, 10, txt=title, ln=1, align='C')
-        pdf.ln(10)
+        pdf.ln(8)
         
         # Обработка контента
-        lines = content.split('\n')
-        current_style = ('DejaVu' if 'DejaVu' in pdf.fonts else 'Arial', '', 12)
-        
-        for line in lines:
-            line = clean_markdown(line.strip())
-            if not line:
+        paragraphs = re.split(r'\n\s*\n', content)  # Разделение на параграфы
+        for para in paragraphs:
+            para = clean_markdown(para)
+            if not para:
                 pdf.ln(5)
                 continue
+            
+            # Определение стиля
+            if para.upper() == para and len(para) < 100:  # Заголовок
+                set_font('bold', 14)
+                pdf.cell(0, 8, txt=para, ln=1)
+                pdf.ln(4)
+                continue
+            elif para.endswith(':'):  # Подзаголовок
+                set_font('bold', 12)
+                pdf.cell(0, 7, txt=para, ln=1)
+                pdf.ln(3)
+                continue
+            else:  # Обычный текст
+                set_font('normal', 12)
                 
-            # Определение стиля текста
-            new_style = current_style
-            if line.upper() == line and len(line) < 50:  # Заголовки в верхнем регистре
-                new_style = ('DejaVuB' if 'DejaVuB' in pdf.fonts else 'ArialB', '', 14)
-            elif line.endswith(':'):  # Подзаголовки
-                new_style = ('DejaVuB' if 'DejaVuB' in pdf.fonts else 'ArialB', '', 12)
+            # Обработка многострочного текста с переносами
+            lines = pdf.multi_cell(
+                w=effective_width,
+                h=6,
+                txt=para,
+                split_only=True
+            )
             
-            if new_style != current_style:
-                pdf.set_font(*new_style)
-                current_style = new_style
-                pdf.ln(5)
+            for line in lines:
+                pdf.cell(0, 6, txt=line, ln=1)
             
-            # Разбиваем длинные строки на слова
-            words = line.split()
-            current_line = []
-            current_length = 0
-            
-            for word in words:
-                word_width = pdf.get_string_width(word + ' ')
-                if current_length + word_width < effective_page_width:
-                    current_line.append(word)
-                    current_length += word_width
-                else:
-                    # Печатаем текущую строку
-                    pdf.cell(0, 6, txt=' '.join(current_line), ln=1)
-                    current_line = [word]
-                    current_length = word_width
-            
-            # Печатаем оставшиеся слова
-            if current_line:
-                pdf.cell(0, 6, txt=' '.join(current_line), ln=1)
-            
-            pdf.ln(2)
+            pdf.ln(3)
         
         buffer = BytesIO()
         pdf.output(buffer)
