@@ -335,10 +335,10 @@ def generate_final_conclusions(context):
     prompt = f"""
     На основе анализа сформулируйте итоговые выводы по проблеме:
     
-    {st.session_state.problem_formulation}
+    {st.session_state.problem_formulation} таким образом, чтобы рассуждения не отклонялись от смысла запроса пользователя {query}
     
     Контекст анализа:
-    {context}
+    {context} и результаты веб-поиска {all_search_results}, {search_results}
     
     Требования:
     - Сравните решения от разных методик
@@ -508,7 +508,7 @@ def generate_response():
             for i, query in enumerate(refinement_queries):
                 try:
                     clean_query = query.replace('"', '').strip()
-                    search_results = searcher.perform_search(clean_query, max_results=2, full_text=True)
+                    search_results = searcher.perform_search(clean_query, max_results=3, full_text=True)
                 
                     formatted = []
                     for j, r in enumerate(search_results, 1):
