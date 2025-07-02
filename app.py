@@ -400,24 +400,41 @@ def generate_response():
         if not query:
             status_area.warning("⚠️ Введите запрос")
             return
-
+        
         # Этап 1: Формулирование проблемы и генерация запросов
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
         problem_result, queries = formulate_problem_and_queries()
         
-        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
-            st.subheader("Сформулированная проблема")
-            st.write(st.session_state.problem_formulation)
+        # Инициализация состояния для кнопки
+        if 'reasoning_visible' not in st.session_state:
+            st.session_state.reasoning_visible = False
             
-            # ВЫВОД РАССУЖДЕНИЙ - НОВЫЙ БЛОК
-            if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
-                with st.expander("🔍 Рассуждения и внутренний диалог", expanded=True):
-                    st.write(st.session_state.internal_dialog)
-            else:
-                st.warning("Рассуждения не были сгенерированы")
+        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.subheader("Сформулированная проблема")
+                st.write(st.session_state.problem_formulation)
+            
+            with col2:
+                # Кнопка переключения видимости рассуждений
+                if st.button("👁️ Показать рассуждения" if not st.session_state.reasoning_visible else "🙈 Скрыть рассуждения",
+                            key="toggle_reasoning"):
+                    st.session_state.reasoning_visible = not st.session_state.reasoning_visible
+            
+            # Показ рассуждений
+            if st.session_state.reasoning_visible:
+                st.subheader("Рассуждения и внутренний диалог")
+                if st.session_state.internal_dialog:
+                    st.text_area("", 
+                                value=st.session_state.internal_dialog, 
+                                height=300,
+                                label_visibility="collapsed")
+                else:
+                    st.warning("Рассуждения не были сгенерированы")
             
             st.subheader("Сгенерированные поисковые запросы")
-            st.write(queries)
+            st.write(st.session_state.generated_queries)
             
             with st.expander("📄 Полный вывод LLM", expanded=False):
                 st.code(problem_result, language='text')
