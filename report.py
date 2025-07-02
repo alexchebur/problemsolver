@@ -1,185 +1,130 @@
 # report.py
 import re
-import os
-import tempfile
 import base64
-import logging
-from io import BytesIO
-from fpdf import FPDF
-from PIL import Image
-from mermaid import process_mermaid_diagrams
+from datetime import datetime
+from mermaid import extract_mermaid_code
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Конфигурация шрифтов
-FONT_DIR = "fonts/"
-FONT_MAPPING = {
-    'normal': {
-        'builtin': 'Helvetica',
-        'custom': {'path': FONT_DIR+'DejaVuSansCondensed.ttf', 'name': 'DejaVu'}
-    },
-    'bold': {
-        'builtin': 'Helvetica-B',
-        'custom': {'path': FONT_DIR+'DejaVuSansCondensed-Bold.ttf', 'name': 'DejaVuB'}
-    }
-}
-
-def create_pdf(content, title="Отчет"):
-    try:
-        logger.info("Начало создания PDF...")
-        original_content = content
-        
-        pdf = FPDF()
-        pdf.add_page()
-        
-        logger.info("Пытаемся загрузить шрифты...")
-        custom_fonts_available = True
-        for font_type in FONT_MAPPING.values():
-            try:
-                if os.path.exists(font_type['custom']['path']):
-                    pdf.add_font(
-                        font_type['custom']['name'],
-                        '',
-                        font_type['custom']['path'],
-                        uni=True
-                    )
-                else:
-                    logger.warning(f"Файл шрифта не найден: {font_type['custom']['path']}")
-                    custom_fonts_available = False
-            except Exception as e:
-                logger.error(f"Ошибка загрузки шрифта: {str(e)}")
-                custom_fonts_available = False
-        
-        def set_font(style='normal', size=12):
-            if custom_fonts_available:
-                font_name = FONT_MAPPING[style]['custom']['name']
-            else:
-                font_name = FONT_MAPPING[style]['builtin']
-            pdf.set_font(font_name, '', size)
-        
-        pdf.set_auto_page_break(auto=True, margin=15)
-        effective_width = pdf.w - 2*pdf.l_margin
-        
-        def clean_markdown(text):
-            text = re.sub(r'```mermaid.*?```', '', text, flags=re.DOTALL)
-            replacements = [
-                (r'#{1,3}\s*', ''),
-                (r'\*{2}(.*?)\*{2}', r'\1'),
-                (r'_{2}(.*?)_{2}', r'\1'),
-                (r'`{1,3}(.*?)`{1,3}', r'\1'),
-                (r'\[(.*?)\]\(.*?\)', r'\1'),
-                (r'\s+', ' ')
-            ]
-            for pattern, repl in replacements:
-                text = re.sub(pattern, repl, text)
-            return text.strip()
-        
-        set_font('bold', 16)
-        pdf.cell(0, 10, txt=title, ln=1, align='C')
-        pdf.ln(8)
-        
-        logger.info("Очистка Markdown...")
-        cleaned_content = clean_markdown(content)
-        paragraphs = re.split(r'\n\s*\n', cleaned_content)
-
-        logger.info("Добавление текста в PDF...")
-        for para in paragraphs:
-            para = para.strip()
-            if not para:
-                pdf.ln(5)
-                continue
-            
-            if para.upper() == para and len(para) < 100:
-                set_font('bold', 14)
-                pdf.cell(0, 8, txt=para, ln=1)
-                pdf.ln(4)
-                continue
-            elif para.endswith(':'):
-                set_font('bold', 12)
-                pdf.cell(0, 7, txt=para, ln=1)
-                pdf.ln(3)
-                continue
-            else:
-                set_font('normal', 12)
-                
-            lines = pdf.multi_cell(
-                w=effective_width,
-                h=6,
-                txt=para,
-                split_only=True
-            )
-            
-            for line in lines:
-                pdf.cell(0, 6, txt=line, ln=1)
-            
-            pdf.ln(3)
-        
-        logger.info("Обработка диаграмм Mermaid...")
-        try:
-            mermaid_images = process_mermaid_diagrams(original_content)
-            logger.info(f"Обработано {len(mermaid_images)} диаграмм Mermaid")
-        except Exception as e:
-            logger.error(f"Ошибка обработки Mermaid: {str(e)}")
-            mermaid_images = {}
-
-        if mermaid_images:
-            logger.info("Добавление диаграмм Mermaid в PDF...")
-            pdf.add_page()
-            set_font('bold', 14)
-            pdf.cell(0, 10, txt="Диаграммы Mermaid", ln=1, align='C')
-            pdf.ln(8)
+def create_html_report(content: str, title: str = "Отчет") -> bytes:
+    """Создает HTML отчет с поддержкой Mermaid.js"""
+    # Извлекаем все диаграммы Mermaid
+    mermaid_blocks = extract_mermaid_code(content)
     
-            for key, value in mermaid_images.items():
-                try:
-                    img_data = value["image"]
-                    img_size = value["size"]
-            
-                    # Проверяем валидность размера
-                    if img_size[0] <= 0 or img_size[1] <= 0:
-                        img_size = (800, 200)  # Размер по умолчанию
-                
-                    max_width = pdf.w - 20
-                    max_height = pdf.h - 50
-            
-                    width_ratio = max_width / img_size[0] if img_size[0] > 0 else 1
-                    height_ratio = max_height / img_size[1] if img_size[1] > 0 else 1
-                    ratio = min(width_ratio, height_ratio)
-            
-                    if ratio < 0.1:
-                        ratio = 0.1
-            
-                    new_width = img_size[0] * ratio
-                    new_height = img_size[1] * ratio
-            
-                    x = (pdf.w - new_width) / 2
-                    y = (pdf.h - new_height) / 2
-            
-                    with tempfile.NamedTemporaryFile(delete=True, suffix=".png") as tmp_file:
-                        tmp_file.write(base64.b64decode(img_data))
-                        tmp_file.flush()
-                
-                        # Проверяем существование файла
-                        if os.path.exists(tmp_file.name):
-                            pdf.image(tmp_file.name, x=x, y=y, w=new_width)
-                        else:
-                            logger.error(f"Файл изображения не найден: {tmp_file.name}")
-            
-                    set_font('normal', 10)
-                    pdf.ln(new_height + 5)
-                    pdf.cell(0, 6, txt=f"Диаграмма {key}", ln=1)
-                    pdf.ln(5)
-                except Exception as e:
-                    logger.error(f"Ошибка вставки диаграммы {key}: {str(e)}")
-        else:
-            logger.info("Диаграммы Mermaid не обнаружены")
+    # Генерируем HTML
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>{title}</title>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                max-width: 800px;
+                margin: auto;
+                padding: 20px;
+                background-color: #f8f9fa;
+            }}
+            .report-header {{
+                text-align: center;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #3498db;
+                padding-bottom: 10px;
+            }}
+            .content {{
+                background-color: white;
+                padding: 30px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }}
+            pre {{
+                background-color: #f5f5f5;
+                padding: 15px;
+                border-radius: 5px;
+                overflow-x: auto;
+            }}
+            code {{
+                background-color: #f5f5f5;
+                padding: 2px 4px;
+                border-radius: 3px;
+            }}
+            .mermaid-container {{
+                text-align: center;
+                margin: 30px 0;
+                padding: 20px;
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            }}
+            .footer {{
+                text-align: center;
+                margin-top: 30px;
+                font-size: 0.9em;
+                color: #7f8c8d;
+            }}
+            h1, h2, h3 {{
+                color: #2c3e50;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="report-header">
+            <h1>{title}</h1>
+            <p>Сгенерировано: {datetime.now().strftime("%Y-%m-%d %H:%M")}</p>
+        </div>
         
-        buffer = BytesIO()
-        pdf.output(buffer)
-        logger.info("PDF успешно создан")
-        return buffer.getvalue()
+        <div class="content">
+            {convert_md_to_html(content)}
+        </div>
+        
+        <script>
+            // Инициализация Mermaid
+            mermaid.initialize({{
+                startOnLoad: true,
+                theme: 'default',
+                securityLevel: 'loose'
+            }});
+            
+            // Перерисовка диаграмм при изменении размера окна
+            window.addEventListener('resize', function() {{
+                mermaid.init(undefined, '.mermaid');
+            }});
+        </script>
+        
+        <div class="footer">
+            Отчет сгенерирован с помощью Troubleshooter
+        </div>
+    </body>
+    </html>
+    """
     
-    except Exception as e:
-        logger.exception("Ошибка при создании PDF")
-        return None
+    return html_template.encode('utf-8')
+
+def convert_md_to_html(md_text: str) -> str:
+    """Конвертирует Markdown в HTML с сохранением блоков Mermaid"""
+    # Обрабатываем блоки Mermaid
+    md_text = re.sub(
+        r'```mermaid(.*?)```', 
+        r'<div class="mermaid-container"><div class="mermaid">\1</div></div>', 
+        md_text, 
+        flags=re.DOTALL
+    )
+    
+    # Конвертируем базовый Markdown в HTML
+    replacements = [
+        (r'### (.*)', r'<h3>\1</h3>'),
+        (r'## (.*)', r'<h2>\1</h2>'),
+        (r'# (.*)', r'<h1>\1</h1>'),
+        (r'\*\*(.*?)\*\*', r'<strong>\1</strong>'),
+        (r'\*(.*?)\*', r'<em>\1</em>'),
+        (r'`(.*?)`', r'<code>\1</code>'),
+        (r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>'),
+        (r'\n\s*\n', r'</p><p>'),
+        (r'!\[(.*?)\]\((.*?)\)', r'<img src="\2" alt="\1" style="max-width:100%;">')
+    ]
+    
+    for pattern, repl in replacements:
+        md_text = re.sub(pattern, repl, md_text)
+    
+    return f'<p>{md_text}</p>'
