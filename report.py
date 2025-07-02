@@ -3,10 +3,15 @@ import re
 import os
 import tempfile
 import base64
+import logging
 from io import BytesIO
 from fpdf import FPDF
 from PIL import Image
 from mermaid import process_mermaid_diagrams
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Конфигурация шрифтов
 FONT_DIR = "fonts/"
@@ -23,23 +28,29 @@ FONT_MAPPING = {
 
 def create_pdf(content, title="Отчет"):
     try:
+        logger.info("Начало создания PDF...")
         original_content = content
         
         pdf = FPDF()
         pdf.add_page()
         
+        logger.info("Пытаемся загрузить шрифты...")
         custom_fonts_available = True
         for font_type in FONT_MAPPING.values():
             try:
-                pdf.add_font(
-                    font_type['custom']['name'],
-                    '',
-                    font_type['custom']['path'],
-                    uni=True
-                )
-            except:
+                if os.path.exists(font_type['custom']['path']):
+                    pdf.add_font(
+                        font_type['custom']['name'],
+                        '',
+                        font_type['custom']['path'],
+                        uni=True
+                    )
+                else:
+                    logger.warning(f"Файл шрифта не найден: {font_type['custom']['path']}")
+                    custom_fonts_available = False
+            except Exception as e:
+                logger.error(f"Ошибка загрузки шрифта: {str(e)}")
                 custom_fonts_available = False
-                break
         
         def set_font(style='normal', size=12):
             if custom_fonts_available:
@@ -69,9 +80,11 @@ def create_pdf(content, title="Отчет"):
         pdf.cell(0, 10, txt=title, ln=1, align='C')
         pdf.ln(8)
         
+        logger.info("Очистка Markdown...")
         cleaned_content = clean_markdown(content)
         paragraphs = re.split(r'\n\s*\n', cleaned_content)
 
+        logger.info("Добавление текста в PDF...")
         for para in paragraphs:
             para = para.strip()
             if not para:
@@ -103,9 +116,12 @@ def create_pdf(content, title="Отчет"):
             
             pdf.ln(3)
         
+        logger.info("Обработка диаграмм Mermaid...")
         mermaid_images = process_mermaid_diagrams(original_content)
+        logger.info(f"Обработано {len(mermaid_images)} диаграмм Mermaid")
         
         if mermaid_images:
+            logger.info("Добавление диаграмм Mermaid в PDF...")
             pdf.add_page()
             set_font('bold', 14)
             pdf.cell(0, 10, txt="Диаграммы Mermaid", ln=1, align='C')
@@ -118,8 +134,8 @@ def create_pdf(content, title="Отчет"):
                 max_width = pdf.w - 20
                 max_height = pdf.h - 50
                 
-                width_ratio = max_width / img_size[0]
-                height_ratio = max_height / img_size[1]
+                width_ratio = max_width / img_size[0] if img_size[0] > 0 else 1
+                height_ratio = max_height / img_size[1] if img_size[1] > 0 else 1
                 ratio = min(width_ratio, height_ratio)
                 
                 if ratio < 0.1:
@@ -140,11 +156,14 @@ def create_pdf(content, title="Отчет"):
                 pdf.ln(new_height + 5)
                 pdf.cell(0, 6, txt=f"Диаграмма {key}", ln=1)
                 pdf.ln(5)
+        else:
+            logger.info("Диаграммы Mermaid не обнаружены")
         
         buffer = BytesIO()
         pdf.output(buffer)
+        logger.info("PDF успешно создан")
         return buffer.getvalue()
     
     except Exception as e:
-        print(f"Ошибка при создании PDF: {str(e)}")
+        logger.exception("Ошибка при создании PDF")
         return None
