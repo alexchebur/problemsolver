@@ -13,4 +13,5 @@
    cairosvg
    pygments
    markdown
+   duckduckpy
 
