@@ -400,14 +400,7 @@ def generate_response():
         if not query:
             status_area.warning("⚠️ Введите запрос")
             return
-def generate_response():
-    st.session_state.processing = True
-    st.session_state.report_content = None
-    status_area = st.empty()
-    progress_bar = st.progress(0)
 
-    try:
-        # ... существующий код до этапа 1 ...
 
         # Этап 1: Формулирование проблемы и генерация запросов
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
