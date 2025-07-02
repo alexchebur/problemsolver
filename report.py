@@ -117,45 +117,61 @@ def create_pdf(content, title="Отчет"):
             pdf.ln(3)
         
         logger.info("Обработка диаграмм Mermaid...")
-        mermaid_images = process_mermaid_diagrams(original_content)
-        logger.info(f"Обработано {len(mermaid_images)} диаграмм Mermaid")
-        
+        try:
+            mermaid_images = process_mermaid_diagrams(original_content)
+            logger.info(f"Обработано {len(mermaid_images)} диаграмм Mermaid")
+        except Exception as e:
+            logger.error(f"Ошибка обработки Mermaid: {str(e)}")
+            mermaid_images = {}
+
         if mermaid_images:
             logger.info("Добавление диаграмм Mermaid в PDF...")
             pdf.add_page()
             set_font('bold', 14)
             pdf.cell(0, 10, txt="Диаграммы Mermaid", ln=1, align='C')
             pdf.ln(8)
-            
+    
             for key, value in mermaid_images.items():
-                img_data = value["image"]
-                img_size = value["size"]
+                try:
+                    img_data = value["image"]
+                    img_size = value["size"]
+            
+                    # Проверяем валидность размера
+                    if img_size[0] <= 0 or img_size[1] <= 0:
+                        img_size = (800, 200)  # Размер по умолчанию
                 
-                max_width = pdf.w - 20
-                max_height = pdf.h - 50
+                    max_width = pdf.w - 20
+                    max_height = pdf.h - 50
+            
+                    width_ratio = max_width / img_size[0] if img_size[0] > 0 else 1
+                    height_ratio = max_height / img_size[1] if img_size[1] > 0 else 1
+                    ratio = min(width_ratio, height_ratio)
+            
+                    if ratio < 0.1:
+                        ratio = 0.1
+            
+                    new_width = img_size[0] * ratio
+                    new_height = img_size[1] * ratio
+            
+                    x = (pdf.w - new_width) / 2
+                    y = (pdf.h - new_height) / 2
+            
+                    with tempfile.NamedTemporaryFile(delete=True, suffix=".png") as tmp_file:
+                        tmp_file.write(base64.b64decode(img_data))
+                        tmp_file.flush()
                 
-                width_ratio = max_width / img_size[0] if img_size[0] > 0 else 1
-                height_ratio = max_height / img_size[1] if img_size[1] > 0 else 1
-                ratio = min(width_ratio, height_ratio)
-                
-                if ratio < 0.1:
-                    ratio = 0.1
-                
-                new_width = img_size[0] * ratio
-                new_height = img_size[1] * ratio
-                
-                x = (pdf.w - new_width) / 2
-                y = (pdf.h - new_height) / 2
-                
-                with tempfile.NamedTemporaryFile(delete=True, suffix=".png") as tmp_file:
-                    tmp_file.write(base64.b64decode(img_data))
-                    tmp_file.flush()
-                    pdf.image(tmp_file.name, x=x, y=y, w=new_width)
-                
-                set_font('normal', 10)
-                pdf.ln(new_height + 5)
-                pdf.cell(0, 6, txt=f"Диаграмма {key}", ln=1)
-                pdf.ln(5)
+                        # Проверяем существование файла
+                        if os.path.exists(tmp_file.name):
+                            pdf.image(tmp_file.name, x=x, y=y, w=new_width)
+                        else:
+                            logger.error(f"Файл изображения не найден: {tmp_file.name}")
+            
+                    set_font('normal', 10)
+                    pdf.ln(new_height + 5)
+                    pdf.cell(0, 6, txt=f"Диаграмма {key}", ln=1)
+                    pdf.ln(5)
+                except Exception as e:
+                    logger.error(f"Ошибка вставки диаграммы {key}: {str(e)}")
         else:
             logger.info("Диаграммы Mermaid не обнаружены")
         
