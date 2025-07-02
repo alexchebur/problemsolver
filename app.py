@@ -563,14 +563,17 @@ if st.session_state.report_content and not st.session_state.processing:
     st.markdown(txt_href, unsafe_allow_html=True)
     
     # PDF экспорт
-    try:
-        pdf_bytes = create_pdf(st.session_state.report_content)
-        if pdf_bytes:
-            b64_pdf = base64.b64encode(pdf_bytes).decode()
-            pdf_href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="report.pdf">📥 Скачать PDF отчет</a>'
-            st.markdown(pdf_href, unsafe_allow_html=True)
-    except Exception as e:
-        st.warning(f"Не удалось создать PDF: {str(e)}")
+    with st.spinner("🔄 Создание PDF файла..."):
+        try:
+            pdf_bytes = create_pdf(st.session_state.report_content)
+            if pdf_bytes:
+                b64_pdf = base64.b64encode(pdf_bytes).decode()
+                pdf_href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="report.pdf">📥 Скачать PDF отчет</a>'
+                st.markdown(pdf_href, unsafe_allow_html=True)
+            else:
+                st.warning("Не удалось создать PDF файл")
+        except Exception as e:
+            st.error(f"Ошибка при создании PDF: {str(e)}")
 
 if st.session_state.processing:
     st.info("⏳ Обработка запроса...")
