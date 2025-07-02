@@ -101,8 +101,8 @@ def create_pdf(content, title="Отчет"):
         
         # Настройка шрифтов (должны быть доступны в системе)
         try:
-            pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
-            pdf.add_font('DejaVuB', '', 'DejaVuSansCondensed-Bold.ttf', uni=True)
+            pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
+            pdf.add_font('DejaVuB', '', 'fonts/DejaVuSansCondensed-Bold.ttf', uni=True)
         except:
             # Fallback к стандартным шрифтам, если DejaVu не доступен
             pdf.add_font('Arial', '', 'arial.ttf', uni=True)
@@ -335,7 +335,7 @@ def generate_final_conclusions(context):
     prompt = f"""
     На основе анализа сформулируйте итоговые выводы по проблеме:
     
-    {st.session_state.problem_formulation} таким образом, чтобы рассуждения не отклонялись от смысла запроса пользователя {query}
+    {st.session_state.problem_formulation} таким образом, чтобы рассуждения не отклонялись от смысла запроса пользователя 
     
     Контекст анализа:
     {context} и результаты веб-поиска {all_search_results}, {search_results}
