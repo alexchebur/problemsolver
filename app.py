@@ -390,17 +390,17 @@ def generate_response():
     progress_bar = st.progress(0)
 
     try:
-        test_response = requests.get("https://www.google.com", timeout=10)
-        st.info(f"Сетевая доступность: {'OK' if test_response.status_code == 200 else 'Проблемы'}")
-    except Exception as e:
-        st.error(f"Сетевая ошибка: {str(e)}")
+        # Проверка сетевой доступности
+        try:
+            test_response = requests.get("https://www.google.com", timeout=10)
+            st.info(f"Сетевая доступность: {'OK' if test_response.status_code == 200 else 'Проблемы'}")
+        except Exception as e:
+            st.error(f"Сетевая ошибка: {str(e)}")
 
-    try:
         query = st.session_state.input_query.strip()
         if not query:
             status_area.warning("⚠️ Введите запрос")
             return
-
 
         # Этап 1: Формулирование проблемы и генерация запросов
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
@@ -408,52 +408,44 @@ def generate_response():
         
         # Основной контейнер для этапа 1
         with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
-            st.subheader("Сформулированная проблема")
-            st.write(st.session_state.problem_formulation)
+            col1, col2 = st.columns([3, 1])
             
-            st.subheader("Сгенерированные поисковые запросы")
-            st.write(queries)
+            with col1:
+                st.subheader("Сформулированная проблема")
+                st.write(st.session_state.problem_formulation)
+                
+                st.subheader("Сгенерированные поисковые запросы")
+                st.write(queries)
             
-            # Кнопка для отображения рассуждений в отдельном expander
-            if st.button("👁️ Показать рассуждения", key="show_reasoning_button"):
-                st.session_state.show_reasoning = True
+            with col2:
+                # Кнопка для отображения/скрытия рассуждений в сайдбаре
+                if st.button("🧠 Показать рассуждения" if not st.session_state.get('show_reasoning', False) else "🙈 Скрыть рассуждения",
+                            key="toggle_reasoning"):
+                    st.session_state.show_reasoning = not st.session_state.get('show_reasoning', False)
             
-            # Кнопка для полного вывода LLM
+            # Полный вывод LLM
             with st.expander("📄 Полный вывод LLM", expanded=False):
                 st.code(problem_result, language='text')
         
-        # Отдельный expander для рассуждений (вне основного)
-        if st.session_state.get('show_reasoning', False):
-            with st.expander("🧠 Рассуждения и внутренний диалог ИИ", expanded=True):
-                if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
-                    st.text_area(
-                        "Ход мыслей:",
-                        value=st.session_state.internal_dialog,
-                        height=300,
-                        label_visibility="collapsed"
-                    )
-                else:
-                    st.warning("Рассуждения не были сгенерированы")
-                    st.info("""
-                    Это могло произойти по нескольким причинам:
-                    - LLM не следовала инструкциям по структурированию вывода
-                    - Проблема слишком проста для глубоких рассуждений
-                    - Попробуйте переформулировать запрос или увеличить температуру
-                    """)
+        # Боковая панель: Рассуждения
+        if st.session_state.get('show_reasoning', False) and hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
+            with st.sidebar.expander("🧠 Рассуждения ИИ", expanded=True):
+                st.subheader("Ход мыслей")
+                st.text_area(
+                    "",
+                    value=st.session_state.internal_dialog,
+                    height=300,
+                    label_visibility="collapsed"
+                )
         
-        # ... остальной код без изменений ...
-                with st.expander("Технические детали", expanded=False):
-                    st.code(problem_result, language='text')
-        
-        # ... остальной код без изменений ...
-        
+        # Формирование отчета (без изменений)
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
         if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
 
-        # Этап 2: Поиск информации (используется в контексте, но не добавляется в отчет)
+        # Этап 2: Поиск информации
         status_area.info("🔍 Выполняю поиск информации...")
         all_search_results = ""
         
@@ -474,16 +466,8 @@ def generate_response():
                 search_result_str = "\n\n".join(formatted_results)
                 all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
                 
-                if not search_result_list:
-                    st.warning(f"Нет результатов для: '{search_query}'")
-                    continue
-
-                if 'error' in search_result_list[0]:
-                    error_msg = search_result_list[0].get('error', 'Ошибка поиска')
-                    st.error(f"Ошибка поиска: {error_msg}")
-                    continue
-
-                st.sidebar.subheader(f"Результаты по запросу: '{search_query}'")
+                # Показ результатов в боковой панели
+                st.sidebar.subheader(f"🔍 Результаты по запросу: '{search_query}'")
                 for j, r in enumerate(search_result_list, 1):
                     title = r.get('title', 'Без названия')
                     url = r.get('url', '')
@@ -504,10 +488,7 @@ def generate_response():
         
         st.session_state.search_results = all_search_results
         
-        with st.expander("🔍 Результаты поиска", expanded=False):
-            st.text(all_search_results[:10000] + ("..." if len(all_search_results) > 10000 else ""))
-        
-        # Контекст для следующих этапов (включает результаты поиска)
+        # Контекст для следующих этапов
         context = (
             f"Проблема: {st.session_state.problem_formulation}\n"
             f"Исходный запрос: {query}\n"
@@ -543,7 +524,7 @@ def generate_response():
             
             time.sleep(1)
         
-        # Этап 4: Уточняющий поиск (используется в контексте, но не добавляется в отчет)
+        # Этап 4: Уточняющий поиск
         status_area.info("🔍 Выполняю уточняющий поиск...")
         refinement_search_results = ""
     
@@ -562,7 +543,7 @@ def generate_response():
             for i, query in enumerate(refinement_queries):
                 try:
                     clean_query = query.replace('"', '').strip()
-                    search_results = searcher.perform_search(clean_query, max_results=3, full_text=True)
+                    search_results = searcher.perform_search(clean_query, max_results=2, full_text=True)
                 
                     formatted = []
                     for j, r in enumerate(search_results, 1):
@@ -579,7 +560,7 @@ def generate_response():
                 except Exception as e:
                     refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
     
-        # Обновляем контекст для финальных выводов (включая уточняющий поиск)
+        # Обновляем контекст для финальных выводов
         final_context = f"{context}\n\nРезультаты уточняющего поиска:\n{refinement_search_results}"
     
         # Этап 5: Итоговые выводы
@@ -592,15 +573,15 @@ def generate_response():
                 f"Анализ методик:\n"
                 + "\n\n".join([f"{method}:\n{result}" for method, result in method_results.items()])
             )
-    
+            
             conclusions = generate_final_conclusions(
                 problem_formulation=st.session_state.problem_formulation,
                 analysis_context=analysis_context
             )
-    
+            
             with st.expander("📝 Итоговые выводы", expanded=True):
                 st.write(conclusions)
-    
+            
             full_report += f"### Итоговые выводы ###\n\n{conclusions}\n\n"
         except Exception as e:
             st.error(f"Ошибка при генерации выводов: {str(e)}")
