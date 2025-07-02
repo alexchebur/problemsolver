@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
 from typing import List, Tuple
 import re
-from report import create_pdf
+from report import create_html_report
 #from mermaid import add_mermaid_diagrams_to_pdf 
 
 # Настройка API
@@ -552,7 +552,6 @@ if uploaded_file:
 if st.button("Сгенерировать отчет", disabled=st.session_state.processing):
     generate_response()
 
-# Экспорт результатов
 if st.session_state.report_content and not st.session_state.processing:
     st.divider()
     st.subheader("Экспорт результатов")
@@ -562,18 +561,19 @@ if st.session_state.report_content and not st.session_state.processing:
     txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT отчет</a>'
     st.markdown(txt_href, unsafe_allow_html=True)
     
-    # PDF экспорт
-    with st.spinner("🔄 Создание PDF файла..."):
-        try:
-            pdf_bytes = create_pdf(st.session_state.report_content)
-            if pdf_bytes:
-                b64_pdf = base64.b64encode(pdf_bytes).decode()
-                pdf_href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="report.pdf">📥 Скачать PDF отчет</a>'
-                st.markdown(pdf_href, unsafe_allow_html=True)
-            else:
-                st.warning("Не удалось создать PDF файл")
-        except Exception as e:
-            st.error(f"Ошибка при создании PDF: {str(e)}")
+    # HTML экспорт
+    try:
+        html_bytes = create_html_report(st.session_state.report_content, "Отчет Troubleshooter")
+        b64_html = base64.b64encode(html_bytes).decode()
+        html_href = f'<a href="data:text/html;base64,{b64_html}" download="report.html">📥 Скачать HTML отчет</a>'
+        st.markdown(html_href, unsafe_allow_html=True)
+        
+        # Превью отчета
+        with st.expander("Предпросмотр отчета"):
+            st.components.v1.html(html_bytes.decode('utf-8'), height=600, scrolling=True)
+            
+    except Exception as e:
+        st.error(f"Ошибка при создании HTML отчета: {str(e)}")
 
 if st.session_state.processing:
     st.info("⏳ Обработка запроса...")
