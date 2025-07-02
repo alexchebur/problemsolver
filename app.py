@@ -434,7 +434,7 @@ def generate_response():
             st.sidebar.warning("Рассуждения не были сгенерированы")
         
         # Основной контейнер для этапа 1
-        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
+        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=False):
             st.subheader("Сформулированная проблема")
             st.write(st.session_state.problem_formulation)
             
