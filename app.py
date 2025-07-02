@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
 from typing import List, Tuple
 import re
+from mermaid import add_mermaid_diagrams_to_pdf 
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
@@ -160,7 +161,12 @@ def create_pdf(content, title="Отчет"):
         
         # Обработка контента
         paragraphs = re.split(r'\n\s*\n', content)  # Разделение на параграфы
+
+        if '```mermaid' in content:
+            add_mermaid_diagrams_to_pdf(pdf, content)
         for para in paragraphs:
+            if para.strip().startswith('```mermaid'):
+                continue
             para = clean_markdown(para)
             if not para:
                 pdf.ln(5)
