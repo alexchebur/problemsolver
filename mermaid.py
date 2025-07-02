@@ -4,9 +4,9 @@ import os
 import asyncio
 from pyppeteer import launch
 from PIL import Image
-from fpdf import FPDF
 import tempfile
 import logging
+import base64
 
 def extract_mermaid_code(text: str) -> list:
     """Извлекает все блоки кода Mermaid из текста"""
@@ -16,7 +16,17 @@ def extract_mermaid_code(text: str) -> list:
 
 async def render_mermaid_to_image(mermaid_code: str, output_path: str, width: int = 800):
     """Рендерит код Mermaid в PNG изображение с использованием Pyppeteer"""
-    browser = await launch(headless=True, args=['--no-sandbox'])
+    browser = await launch(
+        headless=True, 
+        args=[
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage'
+        ],
+        handleSIGINT=False,
+        handleSIGTERM=False,
+        handleSIGHUP=False
+    )
     page = await browser.newPage()
     
     # Генерация HTML с Mermaid
@@ -30,7 +40,7 @@ async def render_mermaid_to_image(mermaid_code: str, output_path: str, width: in
             .mermaid-container {{
                 width: {width}px;
                 margin: 0 auto;
-                padding: 20px;
+                padding: 10px;
             }}
         </style>
     </head>
@@ -52,22 +62,57 @@ async def render_mermaid_to_image(mermaid_code: str, output_path: str, width: in
     await page.setContent(html_content)
     await page.waitForSelector('.mermaid', {'timeout': 30000})
     
-    # Ждем завершения анимации
+    # Ждем завершения рендеринга
     await page.waitForFunction('''() => {
         return document.querySelector('.mermaid')?.getAttribute('data-processed') === 'true';
-    }''', timeout=30000)
+    }''', timeout=60000)
+    
+    # Дополнительная задержка для стабилизации
+    await asyncio.sleep(1)
+    
+    # Получаем размеры контейнера
+    dimensions = await page.evaluate('''() => {
+        const element = document.querySelector('.mermaid-container');
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+            width: Math.ceil(rect.width),
+            height: Math.ceil(rect.height)
+        };
+    }''')
+    
+    if not dimensions:
+        logging.error("Не удалось получить размеры контейнера Mermaid")
+        await browser.close()
+        return False
+    
+    # Устанавливаем размеры viewport
+    await page.setViewport({
+        'width': dimensions['width'] + 20,  # + отступы
+        'height': dimensions['height'] + 20
+    })
     
     # Сделаем скриншот только контейнера с диаграммой
-    element = await page.querySelector('.mermaid-container')
-    await element.screenshot({'path': output_path})
+    await page.screenshot({
+        'path': output_path,
+        'clip': {
+            'x': 0,
+            'y': 0,
+            'width': dimensions['width'],
+            'height': dimensions['height']
+        }
+    })
+    
     await browser.close()
+    return True
 
-def add_mermaid_diagrams_to_pdf(pdf: FPDF, content: str):
-    """Добавляет диаграммы Mermaid в PDF документ"""
+def process_mermaid_diagrams(content: str) -> dict:
+    """Обрабатывает все диаграммы Mermaid и возвращает словарь с изображениями"""
     mermaid_blocks = extract_mermaid_code(content)
     if not mermaid_blocks:
-        return
+        return {}
     
+    images = {}
     # Создаем временную директорию для изображений
     with tempfile.TemporaryDirectory() as tmp_dir:
         for i, code in enumerate(mermaid_blocks):
@@ -75,38 +120,24 @@ def add_mermaid_diagrams_to_pdf(pdf: FPDF, content: str):
                 img_path = os.path.join(tmp_dir, f"mermaid_{i}.png")
                 
                 # Рендерим диаграмму в изображение
-                asyncio.get_event_loop().run_until_complete(
+                success = asyncio.get_event_loop().run_until_complete(
                     render_mermaid_to_image(code, img_path)
                 )
                 
-                # Добавляем изображение в PDF
-                pdf.add_page()
-                pdf.set_font("Arial", size=10)
-                pdf.cell(0, 10, txt=f"Диаграмма {i+1}", ln=1, align='C')
+                if not success or not os.path.exists(img_path):
+                    logging.error(f"Не удалось создать изображение для диаграммы {i}")
+                    continue
                 
-                # Рассчитываем размеры для вписывания в страницу
-                with Image.open(img_path) as img:
-                    img_width, img_height = img.size
-                    max_width = pdf.w - 20
-                    max_height = pdf.h - 50
-                    
-                    # Сохраняем пропорции
-                    ratio = min(max_width / img_width, max_height / img_height)
-                    new_width = img_width * ratio
-                    new_height = img_height * ratio
-                    
-                    # Позиционируем по центру
-                    x = (pdf.w - new_width) / 2
-                    y = (pdf.h - new_height) / 2
-                    
-                    pdf.image(img_path, x=x, y=y, w=new_width)
-                
-                # Добавляем исходный код диаграммы
-                pdf.add_page()
-                pdf.set_font("Courier", size=8)
-                pdf.multi_cell(0, 5, txt=f"```mermaid\n{code}\n```")
-                pdf.ln(5)
+                # Конвертируем в base64
+                with open(img_path, "rb") as img_file:
+                    img_data = img_file.read()
+                    images[f"mermaid_{i}"] = {
+                        "code": code,
+                        "image": base64.b64encode(img_data).decode("utf-8"),
+                        "size": Image.open(img_path).size
+                    }
                 
             except Exception as e:
                 logging.error(f"Ошибка при генерации диаграммы Mermaid: {str(e)}")
-                pdf.multi_cell(0, 10, txt=f"[Ошибка при генерации диаграммы Mermaid: {str(e)}]")
+    
+    return images
