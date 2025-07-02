@@ -405,20 +405,26 @@ def generate_response():
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
         problem_result, queries = formulate_problem_and_queries()
         
-        with st.expander("✅ Этап 1: Формулировка проблемы и первичный поиск", expanded=False):
+        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
             st.subheader("Сформулированная проблема")
             st.write(st.session_state.problem_formulation)
-            if hasattr(st.session_state, 'internal_dialog'):
-                st.subheader("Рассуждения")
-                st.write(st.session_state.internal_dialog)
+            
+            # ВЫВОД РАССУЖДЕНИЙ - НОВЫЙ БЛОК
+            if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
+                with st.expander("🔍 Рассуждения и внутренний диалог", expanded=True):
+                    st.write(st.session_state.internal_dialog)
+            else:
+                st.warning("Рассуждения не были сгенерированы")
+            
             st.subheader("Сгенерированные поисковые запросы")
             st.write(queries)
-            st.subheader("Полный вывод LLM")
-            st.code(problem_result, language='text')
+            
+            with st.expander("📄 Полный вывод LLM", expanded=False):
+                st.code(problem_result, language='text')
         
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
-        if hasattr(st.session_state, 'internal_dialog'):
+        if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
             full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
 
