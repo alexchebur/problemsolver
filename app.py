@@ -338,7 +338,7 @@ def generate_final_conclusions(context):
     {st.session_state.problem_formulation} таким образом, чтобы рассуждения не отклонялись от смысла запроса пользователя 
     
     Контекст анализа:
-    {context} и результаты веб-поиска {all_search_results}, {search_results}
+    {context} и результаты веб-поиска 
     
     Требования:
     - Сравните решения от разных методик
@@ -382,7 +382,7 @@ def generate_response():
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
         problem_result, queries = formulate_problem_and_queries()
         
-        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
+        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=False):
             st.subheader("Сформулированная проблема")
             st.write(st.session_state.problem_formulation)
             if hasattr(st.session_state, 'internal_dialog'):
