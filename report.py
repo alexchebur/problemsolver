@@ -36,6 +36,10 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                         `;
                     }}
                     return svg;
+                }},
+                flowchart: {{ 
+                    useMaxWidth: true,
+                    htmlLabels: true 
                 }}
             }});
         </script>
@@ -43,7 +47,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
             body {{
                 font-family: Arial, sans-serif;
                 line-height: 1.6;
-                max-width: 800px;
+                max-width: 1000px;
                 margin: auto;
                 padding: 20px;
                 background-color: #f8f9fa;
@@ -78,6 +82,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 background-color: white;
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+                overflow: auto;
             }}
             .mermaid-error {{
                 color: #721c24;
@@ -171,6 +176,10 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 background-image: linear-gradient(to right, #f8f9fa, #3498db, #f8f9fa);
                 margin: 30px 0;
             }}
+            .diagram-wrapper {{
+                margin: 30px 0;
+                text-align: center;
+            }}
         </style>
     </head>
     <body>
@@ -196,10 +205,15 @@ def convert_md_to_html(md_text: str) -> str:
     """Конвертирует Markdown в HTML с сохранением блоков Mermaid"""
     # Обработка блоков Mermaid
     mermaid_blocks = []
-    placeholder_pattern = "@@MERMAID_BLOCK_{}@@"
+    placeholder_pattern = "@@@MERMAID_BLOCK_{}@@@"
     
     def mermaid_replacer(match):
         mermaid_code = match.group(1).strip()
+        # Удаляем лишние символы в начале и конце
+        mermaid_code = re.sub(r'^[\n\s\[\]]+', '', mermaid_code)
+        mermaid_code = re.sub(r'[\n\s\[\]]+$', '', mermaid_code)
+        # Исправляем экранирование
+        mermaid_code = mermaid_code.replace("&amp;", "&")
         mermaid_blocks.append(mermaid_code)
         return placeholder_pattern.format(len(mermaid_blocks) - 1)
     
@@ -230,14 +244,17 @@ def convert_md_to_html(md_text: str) -> str:
     
     # Восстановление блоков Mermaid
     for i, block in enumerate(mermaid_blocks):
-        # Экранирование специальных символов
-        escaped_block = html.escape(block)
+        # Проверка и исправление синтаксиса диаграмм
+        fixed_block = fix_mermaid_syntax(block)
+        
         mermaid_div = f"""
-        <div class="mermaid-container">
-            <div class="mermaid" id="mermaid-{i}">
-                {escaped_block}
+        <div class="diagram-wrapper">
+            <div class="mermaid-container">
+                <div class="mermaid" id="mermaid-{i}">
+                    {fixed_block}
+                </div>
+                <div id="mermaid-error-mermaid-{i}"></div>
             </div>
-            <div id="mermaid-error-mermaid-{i}"></div>
         </div>
         """
         html_content = html_content.replace(
@@ -246,3 +263,36 @@ def convert_md_to_html(md_text: str) -> str:
         )
     
     return html_content
+
+def fix_mermaid_syntax(mermaid_code: str) -> str:
+    """Исправляет распространенные синтаксические ошибки в диаграммах Mermaid"""
+    # 1. Удаление лишних символов в начале и конце
+    code = mermaid_code.strip()
+    
+    # 2. Замена некорректных символов
+    code = code.replace("&amp;", "&")
+    code = code.replace("&lt;", "<")
+    code = code.replace("&gt;", ">")
+    
+    # 3. Удаление лишних квадратных скобок
+    code = re.sub(r'^[\[\]]+', '', code)
+    code = re.sub(r'[\[\]]+$', '', code)
+    
+    # 4. Проверка ориентации диаграммы
+    if not re.search(r'^\s*(graph|flowchart)\s+[A-Z]{2}', code):
+        if "graph" in code or "flowchart" in code:
+            # Автоматическое определение ориентации
+            if "LR" not in code and "TB" not in code and "BT" not in code and "RL" not in code:
+                code = re.sub(r'(graph|flowchart)\s+', r'\1 LR\n', code)
+    
+    # 5. Проверка синтаксиса узлов
+    code = re.sub(r'(\w+)\[([^\]]+)\]', r'\1["\2"]', code)
+    
+    # 6. Проверка стрелок
+    code = re.sub(r'--+>', '-->', code)
+    code = re.sub(r'&amp;&amp;>', '&&>', code)
+    
+    # 7. Удаление лишних точек с запятой
+    code = re.sub(r';\s*;+', ';', code)
+    
+    return code
