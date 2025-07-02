@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
 from typing import List, Tuple
 import re
+from report import create_pdf
 #from mermaid import add_mermaid_diagrams_to_pdf 
 
 # Настройка API
