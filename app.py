@@ -99,69 +99,76 @@ def create_pdf(content, title="Отчет"):
         pdf = FPDF()
         pdf.add_page()
         
-        # Шрифты (должны быть доступны в системе)
-        pdf.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
-        pdf.add_font('DejaVuB', '', 'fonts/DejaVuSansCondensed-Bold.ttf', uni=True)
+        # Настройка шрифтов (должны быть доступны в системе)
+        try:
+            pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+            pdf.add_font('DejaVuB', '', 'DejaVuSansCondensed-Bold.ttf', uni=True)
+        except:
+            # Fallback к стандартным шрифтам, если DejaVu не доступен
+            pdf.add_font('Arial', '', 'arial.ttf', uni=True)
+            pdf.add_font('ArialB', '', 'arialbd.ttf', uni=True)
         
         # Настройки документа
         pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.set_left_margin(10)
-        pdf.set_right_margin(10)
-        pdf.set_title(title)
+        effective_page_width = pdf.w - 2*pdf.l_margin  # Ширина области текста
+        
+        # Функция для очистки Markdown
+        def clean_markdown(text):
+            # Удаляем заголовки Markdown
+            text = text.replace('### ', '').replace('## ', '').replace('# ', '')
+            # Удаляем жирное и курсивное выделение
+            text = text.replace('**', '').replace('__', '').replace('*', '').replace('_', '')
+            # Удаляем код и блоки кода
+            text = text.replace('`', '').replace('```', '')
+            return text.strip()
         
         # Заголовок документа
-        pdf.set_font('DejaVuB', '', 16)
+        pdf.set_font('DejaVuB' if 'DejaVuB' in pdf.fonts else 'ArialB', '', 16)
         pdf.cell(0, 10, txt=title, ln=1, align='C')
         pdf.ln(10)
         
         # Обработка контента
         lines = content.split('\n')
-        in_list = False
-        list_indent = 0
+        current_style = ('DejaVu' if 'DejaVu' in pdf.fonts else 'Arial', '', 12)
         
         for line in lines:
-            line = line.strip()
-            
-            # Пустые строки
+            line = clean_markdown(line.strip())
             if not line:
                 pdf.ln(5)
-                in_list = False
                 continue
                 
-            # Заголовки 1-го уровня
-            if line.startswith('## '):
-                pdf.set_font('DejaVuB', '', 14)
-                pdf.cell(0, 10, txt=line[3:], ln=1)
-                pdf.set_font('DejaVu', '', 12)
+            # Определение стиля текста
+            new_style = current_style
+            if line.upper() == line and len(line) < 50:  # Заголовки в верхнем регистре
+                new_style = ('DejaVuB' if 'DejaVuB' in pdf.fonts else 'ArialB', '', 14)
+            elif line.endswith(':'):  # Подзаголовки
+                new_style = ('DejaVuB' if 'DejaVuB' in pdf.fonts else 'ArialB', '', 12)
+            
+            if new_style != current_style:
+                pdf.set_font(*new_style)
+                current_style = new_style
                 pdf.ln(5)
-                in_list = False
-                continue
-                
-            # Заголовки 2-го уровня
-            if line.startswith('### '):
-                pdf.set_font('DejaVuB', '', 12)
-                pdf.cell(0, 8, txt=line[4:], ln=1)
-                pdf.set_font('DejaVu', '', 12)
-                pdf.ln(3)
-                in_list = False
-                continue
-                
-            # Списки
-            if line.startswith(('- ', '* ', '1. ', '2. ', '3. ', '4. ', '5. ')):
-                if not in_list:
-                    pdf.ln(3)
-                    in_list = True
-                pdf.set_font('DejaVu', '', 12)
-                pdf.cell(10)  # Отступ
-                bullet = '•' if line.startswith(('- ', '* ')) else ''
-                pdf.cell(0, 6, txt=f"{bullet} {line[2:]}", ln=1)
-                continue
-            else:
-                in_list = False
-                
-            # Обычный текст
-            pdf.set_font('DejaVu', '', 12)
-            pdf.multi_cell(0, 6, txt=line)
+            
+            # Разбиваем длинные строки на слова
+            words = line.split()
+            current_line = []
+            current_length = 0
+            
+            for word in words:
+                word_width = pdf.get_string_width(word + ' ')
+                if current_length + word_width < effective_page_width:
+                    current_line.append(word)
+                    current_length += word_width
+                else:
+                    # Печатаем текущую строку
+                    pdf.cell(0, 6, txt=' '.join(current_line), ln=1)
+                    current_line = [word]
+                    current_length = word_width
+            
+            # Печатаем оставшиеся слова
+            if current_line:
+                pdf.cell(0, 6, txt=' '.join(current_line), ln=1)
+            
             pdf.ln(2)
         
         buffer = BytesIO()
@@ -170,6 +177,7 @@ def create_pdf(content, title="Отчет"):
     
     except Exception as e:
         st.error(f"🚨 Ошибка при создании PDF: {str(e)}")
+        traceback.print_exc()
         return None
 
 def formulate_problem_and_queries():
