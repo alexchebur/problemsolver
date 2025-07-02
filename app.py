@@ -330,10 +330,10 @@ def apply_cognitive_method(method_name, context):
 def generate_refinement_queries(context: str) -> List[str]:
     """Генерирует уточняющие поисковые запросы на основе контекста"""
     prompt = f"""
-    На основе проведенного анализа сформулируйте 3 уточняющих поисковых запросы, 
+    На основе проведенного анализа сформулируйте 5 уточняющих поисковых запросов, 
     которые помогут проверить гипотезы и углубить понимание решения:
     
-    {context[:30000]}
+    {context[:100000]}
     
     Требования:
     - Запросы должны быть конкретными и направленными на проверку гипотез и углубленное понимание проблемы
@@ -342,6 +342,8 @@ def generate_refinement_queries(context: str) -> List[str]:
         1. [Запрос 1]
         2. [Запрос 2]
         3. [Запрос 3]
+        4. [Запрос 4]
+        5. [Запрос 5]
     """
     
     try:
@@ -361,7 +363,7 @@ def generate_refinement_queries(context: str) -> List[str]:
                 query_text = line.split('.', 1)[1].strip() if '. ' in line else line.strip()
                 queries.append(query_text)
         
-        return queries[:3]
+        return queries[:5]
         
     except Exception as e:
         st.error(f"Ошибка при генерации уточняющих запросов: {str(e)}")
@@ -375,7 +377,7 @@ def generate_final_conclusions(problem_formulation: str, analysis_context: str) 
     {problem_formulation}
     
     Контекст анализа:
-    {analysis_context[:30000]}  # Ограничиваем длину контекста
+    {analysis_context[:100000]}  # Ограничиваем длину контекста
     
     Требования:
     - Сравните решения от разных методик
@@ -390,7 +392,7 @@ def generate_final_conclusions(problem_formulation: str, analysis_context: str) 
             prompt,
             generation_config={
                 "temperature": st.session_state.temperature * 0.7,
-                "max_output_tokens": 8000
+                "max_output_tokens": 9000
             },
             request_options={'timeout': 120}
         )
