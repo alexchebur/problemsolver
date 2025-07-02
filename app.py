@@ -13,6 +13,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from websearch import GoogleCSESearcher
 from typing import List, Tuple
+import re
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
@@ -404,7 +405,7 @@ def generate_response():
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
         problem_result, queries = formulate_problem_and_queries()
         
-        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=False):
+        with st.expander("✅ Этап 1: Формулировка проблемы и первичный поиск", expanded=False):
             st.subheader("Сформулированная проблема")
             st.write(st.session_state.problem_formulation)
             if hasattr(st.session_state, 'internal_dialog'):
