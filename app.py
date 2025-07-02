@@ -406,29 +406,8 @@ def generate_response():
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
         problem_result, queries = formulate_problem_and_queries()
         
-        # Основной контейнер для этапа 1
-        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                st.subheader("Сформулированная проблема")
-                st.write(st.session_state.problem_formulation)
-                
-                st.subheader("Сгенерированные поисковые запросы")
-                st.write(queries)
-            
-            with col2:
-                # Кнопка для отображения/скрытия рассуждений в сайдбаре
-                if st.button("🧠 Показать рассуждения" if not st.session_state.get('show_reasoning', False) else "🙈 Скрыть рассуждения",
-                            key="toggle_reasoning"):
-                    st.session_state.show_reasoning = not st.session_state.get('show_reasoning', False)
-            
-            # Полный вывод LLM
-            with st.expander("📄 Полный вывод LLM", expanded=False):
-                st.code(problem_result, language='text')
-        
-        # Боковая панель: Рассуждения
-        if st.session_state.get('show_reasoning', False) and hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
+        # Вывод рассуждений в боковую панель
+        if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
             with st.sidebar.expander("🧠 Рассуждения ИИ", expanded=True):
                 st.subheader("Ход мыслей")
                 st.text_area(
@@ -437,8 +416,22 @@ def generate_response():
                     height=300,
                     label_visibility="collapsed"
                 )
+        else:
+            st.sidebar.warning("Рассуждения не были сгенерированы")
         
-        # Формирование отчета (без изменений)
+        # Основной контейнер для этапа 1
+        with st.expander("✅ Этап 1: Формулировка проблемы", expanded=True):
+            st.subheader("Сформулированная проблема")
+            st.write(st.session_state.problem_formulation)
+            
+            st.subheader("Сгенерированные поисковые запросы")
+            st.write(queries)
+            
+            # Полный вывод LLM
+            with st.expander("📄 Полный вывод LLM", expanded=False):
+                st.code(problem_result, language='text')
+        
+        # Формирование отчета
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
         if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
@@ -467,20 +460,20 @@ def generate_response():
                 all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
                 
                 # Показ результатов в боковой панели
-                st.sidebar.subheader(f"🔍 Результаты по запросу: '{search_query}'")
-                for j, r in enumerate(search_result_list, 1):
-                    title = r.get('title', 'Без названия')
-                    url = r.get('url', '')
-                    snippet = r.get('snippet', '')
+                with st.sidebar.expander(f"🔍 Результаты по запросу: '{search_query}'", expanded=False):
+                    for j, r in enumerate(search_result_list, 1):
+                        title = r.get('title', 'Без названия')
+                        url = r.get('url', '')
+                        snippet = r.get('snippet', '')
 
-                    if url and not url.startswith('http'):
-                        url = 'https://' + url
+                        if url and not url.startswith('http'):
+                            url = 'https://' + url
 
-                    st.sidebar.subheader(f"🔍 {title}")
-                    if url:
-                        st.sidebar.markdown(f"[{url}]({url})")
-                    if snippet:
-                        st.sidebar.write(snippet[:300] + ('...' if len(snippet) > 300 else ''))
+                        st.subheader(f"{j}. {title}")
+                        if url:
+                            st.markdown(f"[{url}]({url})")
+                        if snippet:
+                            st.write(snippet[:300] + ('...' if len(snippet) > 300 else ''))
                 
             except Exception as e:
                 st.error(f"Ошибка поиска для запроса '{search_query}': {str(e)}")
@@ -536,9 +529,9 @@ def generate_response():
         refinement_queries = generate_refinement_queries(refinement_context)
     
         if refinement_queries:
-            st.sidebar.subheader("🔎 Уточняющие запросы")
-            for i, query in enumerate(refinement_queries):
-                st.sidebar.write(f"{i+1}. {query}")
+            with st.sidebar.expander("🔎 Уточняющие запросы", expanded=False):
+                for i, query in enumerate(refinement_queries):
+                    st.write(f"{i+1}. {query}")
             
             for i, query in enumerate(refinement_queries):
                 try:
