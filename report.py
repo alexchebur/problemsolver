@@ -209,12 +209,18 @@ def convert_md_to_html(md_text: str) -> str:
     
     def mermaid_replacer(match):
         mermaid_code = match.group(1).strip()
-        # Удаляем все HTML-теги
-        mermaid_code = re.sub(r'<[^>]+>', '', mermaid_code)
-        # Удаляем лишние пробелы
-        mermaid_code = re.sub(r'\s+', ' ', mermaid_code)
+    
+        # Удаление всех HTML-сущностей
+        mermaid_code = html.unescape(mermaid_code)
+    
+        # Удаление Markdown-разметки
+        mermaid_code = re.sub(r'\*\*|\]\(|\[', '', mermaid_code)
+    
+        # Удаление лишних символов в начале и конце
+        mermaid_code = re.sub(r'^[^a-zA-Z0-9\s]*', '', mermaid_code)
+        mermaid_code = re.sub(r'[^a-zA-Z0-9\s]*$', '', mermaid_code)
+    
         mermaid_blocks.append(mermaid_code)
-        # Возвращаем плейсхолдер с переносами
         return f"\n\n{placeholder_pattern.format(len(mermaid_blocks) - 1)}\n\n"
     
     # Временная замена блоков Mermaid
@@ -257,51 +263,46 @@ def convert_md_to_html(md_text: str) -> str:
     return html_content
     
 def fix_mermaid_syntax(mermaid_code: str) -> str:
-    """Исправляет синтаксические ошибки в диаграммах Mermaid"""
-    # 1. Удаление лишних символов в начале и конце
-    code = mermaid_code.strip()
+    # 1. Удаление всех лишних символов в начале и конце
+    code = re.sub(r'^[^a-zA-Z0-9\s]*', '', mermaid_code)  # Удаление неалфавитных символов в начале
+    code = re.sub(r'[^a-zA-Z0-9\s]*$', '', code)  # Удаление в конце
     
-    # 2. Удаление точек с запятой в конце строк
-    code = re.sub(r';\s*$', '', code, flags=re.MULTILINE)
+    # 2. Коррекция начала диаграммы
+    if not code.startswith('graph') and not code.startswith('flowchart'):
+        code = re.sub(r'^[\s\S]*?(graph|flowchart)', r'\1', code, 1)
     
-    # 3. Замена специальных символов в тексте узлов
-    code = re.sub(r'(["\]])', r'\\\1', code)  # Экранирование специальных символов
+    # 3. Удаление некорректных символов в идентификаторах
+    code = re.sub(r'(\w+)[;|](\s*\w)', r'\1 --> \2', code)
     
-    # 4. Замена кавычек в тексте на одинарные и экранирование
-    code = re.sub(r'"(.*?)"', r"'\1'", code)
+    # 4. Исправление стрелок
+    code = re.sub(r'--&gt;\s*\|&gt;', '-->', code)
+    code = re.sub(r'\|&gt;', '-->', code)
     
-    # 5. Исправление стрелок с текстом
-    code = re.sub(r'--\s*(.*?)\s*-->', r'--> |\1|', code)
+    # 5. Разделение объединенных команд
+    code = re.sub(r'(\w+)\);\s*(\w)', r'\1)\n\2', code)
     
-    # 6. Обработка номеров событий
-    code = code.replace("№", "#")
+    # 6. Обработка стилей
+    code = re.sub(r'style (\w+)', r'\nstyle \1', code)
+    code = re.sub(r'\[/$', '', code)  # Удаление незакрытых тегов
     
-    # 7. Разделение длинных текстов на несколько строк
-    def split_long_text(match):
-        text = match.group(1)
-        words = text.split()
-        if len(words) > 5:
-            # Разбиваем текст на части по 5 слов
-            parts = [words[i:i+5] for i in range(0, len(words), 5)]
-            return '"' + '\\n'.join([' '.join(part) for part in parts]) + '"'
-        return f'"{text}"'
+    # 7. Проверка и исправление структуры
+    if ';' in code:
+        commands = code.split(';')
+        cleaned_commands = []
+        for cmd in commands:
+            cmd = cmd.strip()
+            if cmd:
+                # Проверка на корректность команды
+                if re.match(r'^(\w+|".*")\s*-->', cmd) or re.match(r'^\w+\[".*"\]', cmd):
+                    cleaned_commands.append(cmd)
+                elif '-->' in cmd:
+                    parts = cmd.split('-->')
+                    if len(parts) > 1:
+                        cleaned_commands.append(f'{parts[0].strip()} --> {parts[1].strip()}')
+        code = '\n'.join(cleaned_commands)
     
-    code = re.sub(r'\["(.+?)"\]', split_long_text, code)
-    
-    # 8. Упрощение сложных узлов
-    code = re.sub(
-        r'(\w+)\["(.{30,})"\]', 
-        r'\1["\2"]\nstyle \1 width:300px,height:80px',
-        code
-    )
-    
-    # 9. Добавление ориентации по умолчанию
+    # 8. Добавление отсутствующей ориентации
     if not re.search(r'^\s*(graph|flowchart)\s+[A-Z]{2}', code):
-        if "graph" in code or "flowchart" in code:
-            code = re.sub(r'(graph|flowchart)\s+', r'\1 TD\n', code)
-    
-    # 10. Удаление лишних пробелов
-    code = re.sub(r'\s+', ' ', code)
-    code = re.sub(r'(\S)\s+(\S)', r'\1 \2', code)
+        code = 'graph TD\n' + code
     
     return code
