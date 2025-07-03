@@ -20,52 +20,46 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
         <title>{title}</title>
         <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
         <script>
-            // Ждем полной загрузки страницы
-            document.addEventListener('DOMContentLoaded', function() {{
-                try {{
-                    // Конфигурация Mermaid с обработкой ошибок
-                    mermaid.initialize({{
-                        startOnLoad: true,
-                        theme: 'default',
-                        securityLevel: 'loose',
-                        flowchart: {{
-                            useMaxWidth: true,
-                            htmlLabels: true
-                        }},
-                        errorRenderer: function(err) {{
-                            try {{
-                                const container = document.getElementById('mermaid-error-' + err.strId);
-                                if (container) {{
-                                    container.innerHTML = `
-                                        <div class="mermaid-error">
-                                            <strong>Ошибка в диаграмме:</strong> ${{err.message}}
-                                            <pre>${{err.str}}</pre>
-                                        </div>
-                                    `;
-                                }}
-                            }} catch (e) {{
-                                console.error('Ошибка в обработчике ошибок Mermaid:', e);
-                            }}
-                            return '';
-                        }}
-                    }});
-                
-                    // Явный запуск рендеринга
-                    mermaid.init(undefined, '.mermaid');
-                }} catch (e) {{
-                    console.error('Ошибка инициализации Mermaid:', e);
+            // Конфигурация Mermaid с обработкой ошибок
+            mermaid.initialize({{
+                startOnLoad: true,
+                theme: 'default',
+                securityLevel: 'loose',
+                errorRenderer: function(err, svg) {{
+                    const container = document.getElementById('mermaid-error-' + err.strId);
+                    if (container) {{
+                        container.innerHTML = `
+                            <div class="mermaid-error">
+                                <strong>Ошибка в диаграмме:</strong> ${{err.message}}
+                                <pre>${{err.str}}</pre>
+                            </div>
+                        `;
+                    }}
+                    return svg;
                 }}
             }});
         </script>
         <style>
-            /* ... остальные стили ... */
+            /* ... (существующие стили остаются без изменений) ... */
         </style>
     </head>
     <body>
-        <!-- ... тело отчета ... -->
+        <div class="report-header">
+            <h1>{title}</h1>
+            <p>Сгенерировано: {datetime.now().strftime("%Y-%m-%d %H:%M")}</p>
+        </div>
+        
+        <div class="content">
+            {convert_md_to_html(content)}
+        </div>
+        
+        <div class="footer">
+            Отчет сгенерирован с помощью Troubleshooter
+        </div>
     </body>
     </html>
-    """    
+    """
+    
     return html_template.encode('utf-8')
 
 def convert_md_to_html(md_text: str) -> str:
