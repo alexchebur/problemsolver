@@ -11,7 +11,7 @@ import base64
 import os
 from datetime import datetime
 from bs4 import BeautifulSoup
-from websearch import GoogleCSESearcher
+from websearch import WebSearcher
 from typing import List, Tuple
 import re
 from report import create_html_report
@@ -32,7 +32,7 @@ genai.configure(
 )
 
 # Создаем экземпляр поисковика
-searcher = GoogleCSESearcher()
+searcher = WebSearcher()
 
 # Глобальные переменные состояния
 if 'current_doc_text' not in st.session_state:
