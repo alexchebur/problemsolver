@@ -27,7 +27,7 @@ class GoogleCSESearcher:
         
         # Резервные методы поиска (добавлен DuckDuckGo)
         self.fallback_searchers = [
-            self._search_duckduckgo,  # Первый резерв - DuckDuckGo
+            self._search_duckduckgo,
             self._search_google_organic,
             self._search_bing_ru
         ]
@@ -54,7 +54,7 @@ class GoogleCSESearcher:
                     if results:
                         logger.info(f"Успешный поиск через {searcher.__name__}")
                         
-                        # Добавляем полный текст для DuckDuckGo результатов
+                        # Добавляем полный текст для результатов
                         if full_text:
                             for item in results:
                                 item['full_content'] = self.get_full_page_content(item['url'])
@@ -64,9 +64,9 @@ class GoogleCSESearcher:
                     logger.warning(f"Ошибка в резервном поиске: {str(e)}")
                     time.sleep(1)
             
-            return [{"error": "Все методы поиска недоступны"}]
+            return [{"title": "Ошибка поиска", "url": "#", "snippet": "Все методы поиска недоступны"}]
         except Exception as e:
-            return [{"error": f"Ошибка поиска: {str(e)}"}]
+            return [{"title": "Ошибка поиска", "url": "#", "snippet": f"Ошибка поиска: {str(e)}"}]
         finally:
             time.sleep(random.uniform(*self.delay_range))
 
@@ -86,20 +86,26 @@ class GoogleCSESearcher:
             # Обрабатываем основные результаты
             for item in response.get('results', [])[:max_results]:
                 if 'first_url' in item and 'text' in item:
+                    title = item['text'][:100] if item.get('text') else 'Без названия'
+                    snippet = item['text'][:500] if item.get('text') else 'Без описания'
+                    
                     results.append({
-                        'title': item['text'][:100],
+                        'title': title,
                         'url': item['first_url'],
-                        'snippet': item['text'][:500]
+                        'snippet': snippet
                     })
             
             # Обрабатываем связанные темы (если не набрали достаточно результатов)
             if len(results) < max_results:
                 for item in response.get('related_topics', []):
                     if 'first_url' in item and 'text' in item:
+                        title = item['text'][:100] if item.get('text') else 'Без названия'
+                        snippet = item['text'][:500] if item.get('text') else 'Без описания'
+                        
                         results.append({
-                            'title': item['text'][:100],
+                            'title': title,
                             'url': item['first_url'],
-                            'snippet': item['text'][:500]
+                            'snippet': snippet
                         })
                         if len(results) >= max_results:
                             break
@@ -129,10 +135,14 @@ class GoogleCSESearcher:
         
         results = []
         for item in data.get('items', [])[:max_results]:
+            title = item.get('title', 'Без названия')
+            url = item.get('link', '#')
+            snippet = item.get('snippet', 'Без описания')[:500]
+            
             results.append({
-                'title': item.get('title'),
-                'url': item.get('link'),
-                'snippet': item.get('snippet', '')[:500]
+                'title': title,
+                'url': url,
+                'snippet': snippet
             })
         
         return results
