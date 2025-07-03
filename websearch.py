@@ -1,6 +1,8 @@
 import time
 import logging
 import requests
+import json
+import urllib.parse
 from typing import List, Dict, Union
 import random
 from bs4 import BeautifulSoup
@@ -96,44 +98,118 @@ class GoogleCSESearcher:
             item['full_content'] = self.get_full_page_content(item['url'])
 
     def _search_duckduckgo(self, query: str, max_results: int) -> List[Dict]:
-        """Поиск через DuckDuckGo API"""
+        """Надежный поиск через DuckDuckGo с прямым доступом к API"""
         try:
-            from duckduckpy import query as dd_query
-        except ImportError:
-            logger.warning("Библиотека duckduckpy не установлена")
-            return []
-
-        try:
-            response = dd_query(query, container='dict')
+            # Прямой вызов DuckDuckGo API
+            url = "https://api.duckduckgo.com/"
+            params = {
+                'q': query,
+                'format': 'json',
+                'no_redirect': 1,
+                'no_html': 1,
+                'skip_disambig': 1,
+                'kl': 'ru-ru'
+            }
+            
+            headers = {'User-Agent': random.choice(USER_AGENTS)}
+            response = self.session.get(url, params=params, headers=headers, timeout=15)
+            response.raise_for_status()
+            
+            # Проверяем корректность JSON
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                logger.error("DuckDuckGo вернул невалидный JSON")
+                return []
+            
             results = []
             
-            # Обрабатываем основные результаты
-            for item in response.get('results', [])[:max_results]:
-                if 'first_url' in item and 'text' in item:
-                    results.append({
-                        'title': item['text'][:100] if item['text'] else 'Без названия',
-                        'url': item['first_url'],
-                        'snippet': item['text'][:500] if item['text'] else 'Без описания',
-                        'query': query
-                    })
+            # Обрабатываем основной результат
+            if data.get('AbstractText'):
+                results.append({
+                    'title': data.get('Heading', 'Без названия')[:100],
+                    'url': data.get('AbstractURL', '#'),
+                    'snippet': data.get('AbstractText', 'Без описания')[:500],
+                    'query': query
+                })
             
             # Обрабатываем связанные темы
-            if len(results) < max_results:
-                for item in response.get('related_topics', []):
-                    if 'first_url' in item and 'text' in item:
-                        results.append({
-                            'title': item['text'][:100] if item['text'] else 'Без названия',
-                            'url': item['first_url'],
-                            'snippet': item['text'][:500] if item['text'] else 'Без описания',
-                            'query': query
-                        })
-                        if len(results) >= max_results:
-                            break
+            for topic in data.get('RelatedTopics', [])[:max_results]:
+                if 'FirstURL' in topic and 'Text' in topic:
+                    results.append({
+                        'title': topic['Text'][:100] if topic.get('Text') else 'Без названия',
+                        'url': topic['FirstURL'],
+                        'snippet': topic['Text'][:500] if topic.get('Text') else 'Без описания',
+                        'query': query
+                    })
+                elif 'Topics' in topic:
+                    for subtopic in topic['Topics'][:max_results - len(results)]:
+                        if 'FirstURL' in subtopic and 'Text' in subtopic:
+                            results.append({
+                                'title': subtopic['Text'][:100] if subtopic.get('Text') else 'Без названия',
+                                'url': subtopic['FirstURL'],
+                                'snippet': subtopic['Text'][:500] if subtopic.get('Text') else 'Без описания',
+                                'query': query
+                            })
             
             return results[:max_results]
         
         except Exception as e:
             logger.error(f"Ошибка DuckDuckGo: {str(e)}")
+            # В случае ошибки пробуем HTML-версию как запасной вариант
+            return self._search_duckduckgo_html(query, max_results)
+
+    def _search_duckduckgo_html(self, query: str, max_results: int) -> List[Dict]:
+        """Резервный метод поиска через парсинг HTML DuckDuckGo"""
+        try:
+            url = "https://html.duckduckgo.com/html/"
+            headers = {
+                'User-Agent': random.choice(USER_AGENTS),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+                'Referer': 'https://duckduckgo.com/',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Origin': 'https://duckduckgo.com',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            
+            data = {'q': query}
+            response = self.session.post(url, headers=headers, data=data, timeout=15)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            # Ищем все результаты
+            for result in soup.select('.result__body')[:max_results]:
+                title_elem = result.select_one('.result__a')
+                snippet_elem = result.select_one('.result__snippet')
+                
+                if title_elem:
+                    title = title_elem.get_text(strip=True)[:100]
+                    url = title_elem.get('href', '#')
+                    
+                    # Обработка относительных URL
+                    if url.startswith('//'):
+                        url = 'https:' + url
+                    elif url.startswith('/'):
+                        url = 'https://duckduckgo.com' + url
+                    
+                    snippet = snippet_elem.get_text(strip=True)[:500] if snippet_elem else 'Без описания'
+                    
+                    results.append({
+                        'title': title,
+                        'url': url,
+                        'snippet': snippet,
+                        'query': query
+                    })
+            
+            return results[:max_results]
+        
+        except Exception as e:
+            logger.error(f"Ошибка DuckDuckGo HTML: {str(e)}")
             return []
 
     def _search_google_cse(self, query: str, max_results: int) -> List[Dict]:
@@ -168,7 +244,7 @@ class GoogleCSESearcher:
         """Органический поиск через Google (резервный метод)"""
         url = "https://www.google.com/search"
         params = {
-            'q': query + " site:.ru",
+            'q': query,
             'num': max_results,
             'hl': 'ru',
             'lr': 'lang_ru',
@@ -179,12 +255,27 @@ class GoogleCSESearcher:
         response = self.session.get(url, params=params, headers=headers, timeout=15)
         response.raise_for_status()
         
-        # Здесь должен быть парсинг результатов, но для примера заглушка
-        return [{
-            'title': 'Резервный результат Google',
-            'url': 'https://www.google.com',
-            'snippet': 'Это результат резервного поиска Google'
-        }]
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        
+        # Парсинг органических результатов
+        for g in soup.select('.g')[:max_results]:
+            anchor = g.select_one('a')
+            if anchor:
+                title = anchor.get_text(strip=True)
+                url = anchor.get('href')
+                snippet = g.select_one('.IsZvec, .VwiC3b').get_text(strip=True)[:500] if g.select_one('.IsZvec, .VwiC3b') else ''
+                
+                # Проверяем, что это не рекламный результат
+                if url and not url.startswith('/search?') and 'google.com' not in url:
+                    results.append({
+                        'title': title[:100],
+                        'url': url,
+                        'snippet': snippet,
+                        'query': query
+                    })
+        
+        return results[:max_results]
 
     def _search_bing_ru(self, query: str, max_results: int) -> List[Dict]:
         """Поиск через Bing (резервный метод)"""
@@ -200,12 +291,25 @@ class GoogleCSESearcher:
         response = self.session.get(url, params=params, headers=headers, timeout=15)
         response.raise_for_status()
         
-        # Здесь должен быть парсинг результатов, но для примера заглушка
-        return [{
-            'title': 'Резервный результат Bing',
-            'url': 'https://www.bing.com',
-            'snippet': 'Это результат резервного поиска Bing'
-        }]
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        
+        # Парсинг результатов Bing
+        for li in soup.select('.b_algo')[:max_results]:
+            anchor = li.select_one('h2 a')
+            if anchor:
+                title = anchor.get_text(strip=True)
+                url = anchor.get('href')
+                snippet = li.select_one('.b_caption p').get_text(strip=True)[:500] if li.select_one('.b_caption p') else ''
+                
+                results.append({
+                    'title': title[:100],
+                    'url': url,
+                    'snippet': snippet,
+                    'query': query
+                })
+        
+        return results[:max_results]
 
     def get_full_page_content(self, url: str) -> str:
         """Получение полного текста страницы"""
