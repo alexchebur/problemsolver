@@ -14,5 +14,5 @@
    pygments
    markdown
    duckduckpy
-   urllib.parse
+   
 
