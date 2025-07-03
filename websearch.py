@@ -1,7 +1,7 @@
 import time
 import logging
 import requests
-from typing import List, Dict
+from typing import List, Dict, Union
 import random
 from bs4 import BeautifulSoup
 
@@ -23,89 +23,109 @@ class GoogleCSESearcher:
         
         # Ваш API ключ и настройки
         self.api_key = "AIzaSyCNVeNmUgrt-kL5ZI4EkHFoTjTzRSWATX4"
-        self.cse_id = "a4f17489c6a0a4414"  # Пример ID, замените на ваш
+        self.cse_id = "a4f17489c6a0a4414"
         
-        # Резервные методы поиска (добавлен DuckDuckGo)
+        # Резервные методы поиска
         self.fallback_searchers = [
             self._search_duckduckgo,
             self._search_google_organic,
             self._search_bing_ru
         ]
 
-    def perform_search(self, query: str, max_results: int = 3, full_text=True) -> List[Dict]:
-        """Основной метод поиска через Google CSE с резервными вариантами"""
+    def perform_search(self, queries: Union[str, List[str]], max_results: int = 3, full_text=True) -> List[Dict]:
+        """Поддерживает поиск по одному запросу или списку запросов"""
+        if isinstance(queries, str):
+            queries = [queries]
+            
+        all_results = []
+        
+        for query in queries:
+            try:
+                # Всегда выполняем поиск по оригинальному запросу пользователя
+                results = self._search_with_fallbacks(query, max_results, full_text)
+                all_results.extend(results)
+            except Exception as e:
+                logger.error(f"Ошибка поиска для '{query}': {str(e)}")
+                all_results.append({
+                    'title': f"Ошибка поиска: {query}",
+                    'url': "#",
+                    'snippet': str(e),
+                    'query': query
+                })
+            finally:
+                time.sleep(random.uniform(*self.delay_range))
+        
+        return all_results
+
+    def _search_with_fallbacks(self, query: str, max_results: int, full_text: bool) -> List[Dict]:
+        """Основная логика поиска с резервными методами"""
         try:
-            # Попытка поиска через Google CSE API
+            # Сначала пробуем Google CSE API
             results = self._search_google_cse(query, max_results)
             if results:
-                logger.info("Успешный поиск через Google CSE API")
-                
-                # Если запрошен полный текст, добавляем его
+                logger.info(f"Успешный поиск через Google CSE: {query}")
                 if full_text:
-                    for item in results:
-                        item['full_content'] = self.get_full_page_content(item['url'])
-                
+                    self._add_full_content(results)
                 return results
-                
-            # Если CSE не вернул результатов, пробуем резервные методы
-            for searcher in self.fallback_searchers:
-                try:
-                    results = searcher(query, max_results)
-                    if results:
-                        logger.info(f"Успешный поиск через {searcher.__name__}")
-                        
-                        # Добавляем полный текст для результатов
-                        if full_text:
-                            for item in results:
-                                item['full_content'] = self.get_full_page_content(item['url'])
-                        
-                        return results
-                except Exception as e:
-                    logger.warning(f"Ошибка в резервном поиске: {str(e)}")
-                    time.sleep(1)
-            
-            return [{"title": "Ошибка поиска", "url": "#", "snippet": "Все методы поиска недоступны"}]
         except Exception as e:
-            return [{"title": "Ошибка поиска", "url": "#", "snippet": f"Ошибка поиска: {str(e)}"}]
-        finally:
-            time.sleep(random.uniform(*self.delay_range))
+            logger.warning(f"Google CSE недоступен для '{query}': {str(e)}")
+        
+        # Если CSE не сработал, пробуем резервные методы
+        for searcher in self.fallback_searchers:
+            try:
+                results = searcher(query, max_results)
+                if results:
+                    logger.info(f"Успешный поиск через {searcher.__name__}: {query}")
+                    if full_text:
+                        self._add_full_content(results)
+                    return results
+            except Exception as e:
+                logger.warning(f"Ошибка в {searcher.__name__} для '{query}': {str(e)}")
+                time.sleep(1)
+        
+        return [{
+            'title': f"Не найдено: {query}",
+            'url': "#",
+            'snippet': "Все методы поиска недоступны",
+            'query': query
+        }]
+
+    def _add_full_content(self, results: List[Dict]):
+        """Добавляет полный контент к результатам"""
+        for item in results:
+            item['full_content'] = self.get_full_page_content(item['url'])
 
     def _search_duckduckgo(self, query: str, max_results: int) -> List[Dict]:
-        """Поиск через DuckDuckGo API (резервный метод)"""
+        """Поиск через DuckDuckGo API"""
         try:
             from duckduckpy import query as dd_query
         except ImportError:
-            logger.warning("Библиотека duckduckpy не установлена. Пропуск DuckDuckGo.")
+            logger.warning("Библиотека duckduckpy не установлена")
             return []
 
         try:
-            # Выполняем запрос в формате словаря
             response = dd_query(query, container='dict')
             results = []
             
             # Обрабатываем основные результаты
             for item in response.get('results', [])[:max_results]:
                 if 'first_url' in item and 'text' in item:
-                    title = item['text'][:100] if item.get('text') else 'Без названия'
-                    snippet = item['text'][:500] if item.get('text') else 'Без описания'
-                    
                     results.append({
-                        'title': title,
+                        'title': item['text'][:100] if item['text'] else 'Без названия',
                         'url': item['first_url'],
-                        'snippet': snippet
+                        'snippet': item['text'][:500] if item['text'] else 'Без описания',
+                        'query': query
                     })
             
-            # Обрабатываем связанные темы (если не набрали достаточно результатов)
+            # Обрабатываем связанные темы
             if len(results) < max_results:
                 for item in response.get('related_topics', []):
                     if 'first_url' in item and 'text' in item:
-                        title = item['text'][:100] if item.get('text') else 'Без названия'
-                        snippet = item['text'][:500] if item.get('text') else 'Без описания'
-                        
                         results.append({
-                            'title': title,
+                            'title': item['text'][:100] if item['text'] else 'Без названия',
                             'url': item['first_url'],
-                            'snippet': snippet
+                            'snippet': item['text'][:500] if item['text'] else 'Без описания',
+                            'query': query
                         })
                         if len(results) >= max_results:
                             break
@@ -135,14 +155,11 @@ class GoogleCSESearcher:
         
         results = []
         for item in data.get('items', [])[:max_results]:
-            title = item.get('title', 'Без названия')
-            url = item.get('link', '#')
-            snippet = item.get('snippet', 'Без описания')[:500]
-            
             results.append({
-                'title': title,
-                'url': url,
-                'snippet': snippet
+                'title': item.get('title', 'Без названия'),
+                'url': item.get('link', '#'),
+                'snippet': item.get('snippet', 'Без описания')[:500],
+                'query': query
             })
         
         return results
