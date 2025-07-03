@@ -201,6 +201,13 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
     
     return html_template.encode('utf-8')
 
+def is_valid_mermaid(code: str) -> bool:
+    """Проверяет базовую валидность кода Mermaid"""
+    # Должен содержать хотя бы одну стрелку и один узел
+    has_arrow = re.search(r'-->|--|==>|~~>', code)
+    has_node = re.search(r'\[".+"\]|\(".+"\)|{".+"}', code)
+    return bool(has_arrow and has_node)
+
 def convert_md_to_html(md_text: str) -> str:
     """Конвертирует Markdown в HTML с сохранением блоков Mermaid"""
     # Обработка блоков Mermaid
@@ -209,18 +216,15 @@ def convert_md_to_html(md_text: str) -> str:
     
     def mermaid_replacer(match):
         mermaid_code = match.group(1).strip()
-    
-        # Удаление всех HTML-сущностей
-        mermaid_code = html.unescape(mermaid_code)
-    
-        # Удаление Markdown-разметки
-        mermaid_code = re.sub(r'\*\*|\]\(|\[', '', mermaid_code)
-    
-        # Удаление лишних символов в начале и конце
-        mermaid_code = re.sub(r'^[^a-zA-Z0-9\s]*', '', mermaid_code)
-        mermaid_code = re.sub(r'[^a-zA-Z0-9\s]*$', '', mermaid_code)
-    
+        # Удаляем все HTML-теги
+        mermaid_code = re.sub(r'<[^>]+>', '', mermaid_code)
+        # Удаляем лишние пробелы
+        mermaid_code = re.sub(r'\s+', ' ', mermaid_code)
+        # Обрезаем слишком длинные диаграммы
+        if len(mermaid_code) > 500:
+            mermaid_code = mermaid_code[:500] + "..."
         mermaid_blocks.append(mermaid_code)
+        # Возвращаем плейсхолдер с переносами
         return f"\n\n{placeholder_pattern.format(len(mermaid_blocks) - 1)}\n\n"
     
     # Временная замена блоков Mermaid
@@ -244,65 +248,94 @@ def convert_md_to_html(md_text: str) -> str:
     
     # Восстановление блоков Mermaid
     for i, block in enumerate(mermaid_blocks):
-        fixed_block = fix_mermaid_syntax(block)
-        mermaid_div = f"""
-        <div class="diagram-wrapper">
-            <div class="mermaid-container">
-                <div class="mermaid" id="mermaid-{i}">
-                    {html.escape(fixed_block)}
+        try:
+            fixed_block = fix_mermaid_syntax(block)
+            
+            # Проверка на пустую диаграмму
+            if not fixed_block.strip() or len(fixed_block.strip()) < 10:
+                raise ValueError("Диаграмма слишком короткая или пустая")
+                
+            mermaid_div = f"""
+            <div class="diagram-wrapper">
+                <div class="mermaid-container">
+                    <div class="mermaid" id="mermaid-{i}">
+                        {html.escape(fixed_block)}
+                    </div>
+                    <div id="mermaid-error-mermaid-{i}"></div>
                 </div>
-                <div id="mermaid-error-mermaid-{i}"></div>
             </div>
-        </div>
-        """
+            """
+        except Exception as e:
+            mermaid_div = f"""
+            <div class="mermaid-error">
+                <strong>Ошибка обработки диаграммы:</strong> {str(e)}
+                <pre>{html.escape(block)}</pre>
+            </div>
+            """
+        
         html_content = html_content.replace(
             placeholder_pattern.format(i), 
             mermaid_div
         )
+
+    if not is_valid_mermaid(fixed_block):
+        raise ValueError("Диаграмма не соответствует базовым требованиям синтаксиса")
     
     return html_content
     
 def fix_mermaid_syntax(mermaid_code: str) -> str:
-    # 1. Удаление всех лишних символов в начале и конце
-    code = re.sub(r'^[^a-zA-Z0-9\s]*', '', mermaid_code)  # Удаление неалфавитных символов в начале
-    code = re.sub(r'[^a-zA-Z0-9\s]*$', '', code)  # Удаление в конце
+    """Исправляет синтаксические ошибки в диаграммах Mermaid"""
+    # 1. Удаление лишних символов в начале и конце
+    code = mermaid_code.strip()
     
-    # 2. Коррекция начала диаграммы
-    if not code.startswith('graph') and not code.startswith('flowchart'):
-        code = re.sub(r'^[\s\S]*?(graph|flowchart)', r'\1', code, 1)
+    # 2. Замена HTML-сущностей на нормальные символы
+    code = html.unescape(code)
     
     # 3. Удаление некорректных символов в идентификаторах
-    code = re.sub(r'(\w+)[;|](\s*\w)', r'\1 --> \2', code)
+    code = re.sub(r'[^a-zA-Z0-9\s_\-\[\]{}();"\'<>=]', '', code)
     
-    # 4. Исправление стрелок
-    code = re.sub(r'--&gt;\s*\|&gt;', '-->', code)
-    code = re.sub(r'\|&gt;', '-->', code)
+    # 4. Замена некорректных кавычек
+    code = re.sub(r'&quot;', '"', code)
     
-    # 5. Разделение объединенных команд
-    code = re.sub(r'(\w+)\);\s*(\w)', r'\1)\n\2', code)
+    # 5. Завершение незаконченных диаграмм
+    if not re.search(r'\]\s*$', code):
+        # Если диаграмма обрывается, удаляем последнюю незавершенную строку
+        lines = code.split('\n')
+        if lines:
+            last_line = lines[-1]
+            if not re.search(r'\]\s*$', last_line) and not re.search(r'[;}]$', last_line):
+                code = '\n'.join(lines[:-1])
     
-    # 6. Обработка стилей
-    code = re.sub(r'style (\w+)', r'\nstyle \1', code)
-    code = re.sub(r'\[/$', '', code)  # Удаление незакрытых тегов
+    # 6. Проверка и завершение узлов
+    def complete_nodes(match):
+        node_text = match.group(1)
+        # Удаляем лишние символы и завершаем узел
+        node_text = re.sub(r'[^a-zA-Z0-9\s_\-]', ' ', node_text)
+        return f'["{node_text.strip()}"]'
     
-    # 7. Проверка и исправление структуры
-    if ';' in code:
-        commands = code.split(';')
-        cleaned_commands = []
-        for cmd in commands:
-            cmd = cmd.strip()
-            if cmd:
-                # Проверка на корректность команды
-                if re.match(r'^(\w+|".*")\s*-->', cmd) or re.match(r'^\w+\[".*"\]', cmd):
-                    cleaned_commands.append(cmd)
-                elif '-->' in cmd:
-                    parts = cmd.split('-->')
-                    if len(parts) > 1:
-                        cleaned_commands.append(f'{parts[0].strip()} --> {parts[1].strip()}')
-        code = '\n'.join(cleaned_commands)
+    code = re.sub(r'\["([^"]*)$', complete_nodes, code)
     
-    # 8. Добавление отсутствующей ориентации
+    # 7. Удаление лишних символов в конце
+    code = re.sub(r'[^\w\s]\s*$', '', code)
+    
+    # 8. Добавление ориентации по умолчанию
     if not re.search(r'^\s*(graph|flowchart)\s+[A-Z]{2}', code):
-        code = 'graph TD\n' + code
+        if "graph" in code or "flowchart" in code:
+            code = re.sub(r'(graph|flowchart)\s+', r'\1 TD\n', code)
+        else:
+            code = "graph TD\n" + code
+    
+    # 9. Упрощение длинных текстов
+    def simplify_text(match):
+        text = match.group(1)
+        if len(text) > 100:
+            return '["Слишком длинный текст"]'
+        return f'["{text}"]'
+    
+    code = re.sub(r'\["([^"]+)"\]', simplify_text, code)
+    
+    # 10. Базовая проверка синтаксиса
+    if not re.search(r'\w+\s*-->', code) or not re.search(r'\[".+"\]', code):
+        return "graph TD\nA[Диаграмма содержит ошибки]\nB[Проверьте синтаксис]"
     
     return code
