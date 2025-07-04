@@ -181,6 +181,18 @@ def fix_mermaid_syntax(mermaid_code: str) -> str:
         else:
             code = "graph TD\n" + code
     
+    # Форматируем диаграмму: каждый элемент на новой строке
+    if '\n' not in code:
+        # Если вся диаграмма в одной строке, разбиваем на элементы
+        code = code.replace(';', ';\n')
+        code = code.replace('{', '{\n')
+        code = code.replace('}', '}\n')
+        code = code.replace('-->', '\n-->')
+        code = re.sub(r'(\w+)\[', r'\n\1[', code)
+        code = re.sub(r'(\w+)\(', r'\n\1(', code)
+        code = re.sub(r'(\w+)\{', r'\n\1{', code)
+        code = re.sub(r'([^\]\)\}])\s+([A-Z])', r'\1\n\2', code)
+    
     # Завершаем все команды точкой с запятой
     lines = []
     for line in code.split('\n'):
@@ -190,4 +202,21 @@ def fix_mermaid_syntax(mermaid_code: str) -> str:
         lines.append(line)
     code = '\n'.join(lines)
     
-    return code
+    # Удаляем пустые строки
+    code = '\n'.join([line for line in code.split('\n') if line.strip()])
+    
+    # Добавляем отступы для улучшения читаемости
+    formatted_code = []
+    indent = 0
+    for line in code.split('\n'):
+        line = line.strip()
+        if line.endswith('{'):
+            formatted_code.append('  ' * indent + line)
+            indent += 1
+        elif line.startswith('}'):
+            indent = max(0, indent - 1)
+            formatted_code.append('  ' * indent + line)
+        else:
+            formatted_code.append('  ' * indent + line)
+    
+    return '\n'.join(formatted_code)
