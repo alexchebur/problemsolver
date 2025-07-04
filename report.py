@@ -38,9 +38,40 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                     return svg;
                 }}
             }});
+        
+            // Перерисовка диаграмм при изменении размера окна
+            window.addEventListener('resize', function() {{
+                mermaid.run({{ querySelector: '.mermaid' }});
+            }});
         </script>
         <style>
-            /* ... (существующие стили остаются без изменений) ... */
+            /* Стили для диаграмм */
+            .diagram-wrapper {{
+                margin: 20px 0;
+                padding: 10px;
+                border: 1px solid #eee;
+                border-radius: 5px;
+                background-color: #f9f9f9;
+            }}
+        
+            .mermaid-container {{
+                overflow-x: auto;
+            }}
+        
+            .mermaid-error-container {{
+                color: #d32f2f;
+                background-color: #ffebee;
+                padding: 10px;
+                border-radius: 4px;
+                margin-top: 10px;
+                font-family: monospace;
+                white-space: pre-wrap;
+            }}
+        
+            /* Остальные стили остаются без изменений */
+            .report-header {{ /* ... */ }}
+            .content {{ /* ... */ }}
+            .footer {{ /* ... */ }}
         </style>
     </head>
     <body>
@@ -48,11 +79,11 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
             <h1>{title}</h1>
             <p>Сгенерировано: {datetime.now().strftime("%Y-%m-%d %H:%M")}</p>
         </div>
-        
+    
         <div class="content">
             {convert_md_to_html(content)}
         </div>
-        
+    
         <div class="footer">
             Отчет сгенерирован с помощью Troubleshooter
         </div>
@@ -74,7 +105,6 @@ def convert_md_to_html(md_text: str) -> str:
         placeholder = f"%%%MERMAID_BLOCK_{block_id}%%%"
         mermaid_blocks[placeholder] = fixed_code
         block_id += 1
-        # Возвращаем блок как отдельный элемент (без оборачивания в p)
         return f"\n\n{placeholder}\n\n"
 
     # Заменяем блоки Mermaid на плейсхолдеры
@@ -104,9 +134,9 @@ def convert_md_to_html(md_text: str) -> str:
         mermaid_html = f"""
 <div class="diagram-wrapper">
     <div class="mermaid-container">
-        <script type="text/mermaid" id="mermaid-{mermaid_id}">
-            {fixed_code}
-        </script>
+        <div class="mermaid" id="mermaid-{mermaid_id}">
+            {html.escape(fixed_code)}
+        </div>
         <div id="mermaid-error-{mermaid_id}" class="mermaid-error-container"></div>
     </div>
 </div>
@@ -115,11 +145,14 @@ def convert_md_to_html(md_text: str) -> str:
     
     # Удаляем возможные обертки параграфов вокруг диаграмм
     html_content = re.sub(
-        r'<p>\s*(<div class="diagram-wrapper">.*?</div>)\s*</p>',
+        r'<p>\s*(<div class="diagram-wrapper".*?</div>)\s*</p>',
         r'\1',
         html_content,
         flags=re.DOTALL
     )
+    
+    # Удаляем пустые параграфы, которые могли образоваться
+    html_content = re.sub(r'<p>\s*</p>', '', html_content)
     
     return html_content
 
