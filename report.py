@@ -17,6 +17,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
     <html>
     <head>
         <meta charset="utf-8">
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Fira+Code&display=swap" rel="stylesheet">
         <title>{title}</title>
         <!-- Загрузка Mermaid в правильном формате -->
         <script src="https://cdn.jsdelivr.net/npm/mermaid@11.0.1/dist/mermaid.min.js"></script>
@@ -61,7 +62,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
             }});
         </script>
         <style>
-        <style>
+        
             /* Базовые стили */
             body {
                 font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
@@ -296,7 +297,6 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                     font-size: 1.8em;
                 }
             }
-    ############################################################### убрать стили выше, если не заработают
             /* Стили для диаграмм */
             .diagram-wrapper {{
                 margin: 25px 0;
