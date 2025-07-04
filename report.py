@@ -18,7 +18,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
     <head>
         <meta charset="utf-8">
         <title>{title}</title>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"></script>
         <script>
             // Конфигурация Mermaid с обработкой ошибок
             mermaid.initialize({{
