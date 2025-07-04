@@ -283,7 +283,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
 
             /* Адаптивность */
             @media (max-width: 768px) {
-                .report {{
+            .report {{
                     padding: 20px;
                     border-radius: 0;
                     box-shadow: none;
