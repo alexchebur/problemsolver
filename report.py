@@ -34,9 +34,9 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                     startOnLoad: true,
                     theme: 'default',
                     securityLevel: 'loose',
-                    themeVariables: { 
-                        fontFamily: 'Arial, sans-serif'
-                    },
+                    themeVariables: {{ 
+                        fontFamily: '"Arial", sans-serif'
+                    }},
                     errorRenderer: function(error) {{
                         try {{
                             const container = error.element.closest('.mermaid-container')
