@@ -64,52 +64,29 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
 
 def convert_md_to_html(md_text: str) -> str:
     """Конвертирует Markdown в HTML с сохранением блоков Mermaid"""
-    # Обработка блоков Mermaid
-    mermaid_blocks = []
-    mermaid_counter = 0
-    
-    def mermaid_replacer(match):
-        nonlocal mermaid_counter
+    mermaid_blocks = {}
+    block_id = 0
+
+    def replace_mermaid_with_placeholder(match):
+        nonlocal block_id
         mermaid_code = match.group(1).strip()
-        
-        # Удаляем все HTML-теги
-        mermaid_code = re.sub(r'<[^>]+>', '', mermaid_code)
-        
-        # Удаляем лишние пробелы
-        mermaid_code = re.sub(r'\s+', ' ', mermaid_code)
-        
-        # Очистка и фиксация синтаксиса
         fixed_code = fix_mermaid_syntax(mermaid_code)
-        
-        # Генерация уникального ID
-        block_id = mermaid_counter
-        mermaid_counter += 1
-        
-        # Создаем HTML для диаграммы
-        mermaid_div = f"""
-        <div class="diagram-wrapper">
-            <div class="mermaid-container">
-                <div class="mermaid" id="mermaid-{block_id}">
-                    {html.escape(fixed_code)}
-                </div>
-                <div id="mermaid-error-mermaid-{block_id}"></div>
-            </div>
-        </div>
-        """
-        
-        return mermaid_div
-    
-    # Замена блоков Mermaid на сгенерированный HTML
-    html_content = re.sub(
-        r'```mermaid\s*(.*?)```', 
-        mermaid_replacer, 
-        md_text, 
+        placeholder = f"%%%MERMAID_PLACEHOLDER_{block_id}%%%"
+        mermaid_blocks[placeholder] = fixed_code
+        block_id += 1
+        return f"\n\n{placeholder}\n\n"  # Отделяем пустыми строками
+
+    # Заменяем блоки Mermaid на плейсхолдеры
+    text_with_placeholders = re.sub(
+        r'```mermaid\s*(.*?)```',
+        replace_mermaid_with_placeholder,
+        md_text,
         flags=re.DOTALL
     )
     
-    # Конвертация оставшегося Markdown в HTML
+    # Конвертируем Markdown в HTML
     html_content = markdown.markdown(
-        html_content,
+        text_with_placeholders,
         extensions=[
             'extra', 'codehilite', 'fenced_code', 
             'tables', 'attr_list', 'md_in_html',
@@ -118,19 +95,32 @@ def convert_md_to_html(md_text: str) -> str:
         output_format='html5'
     )
     
+    # Заменяем плейсхолдеры на финальные блоки Mermaid
+    for placeholder, fixed_code in mermaid_blocks.items():
+        mermaid_html = f"""
+        <div class="diagram-wrapper">
+            <div class="mermaid-container">
+                <script type="text/mermaid" id="mermaid-{placeholder}">
+                    {fixed_code}
+                </script>
+                <div id="mermaid-error-mermaid-{placeholder}"></div>
+            </div>
+        </div>
+        """
+        html_content = html_content.replace(placeholder, mermaid_html)
+    
     return html_content
 
 def fix_mermaid_syntax(mermaid_code: str) -> str:
     """Исправляет синтаксические ошибки в диаграммах Mermaid"""
-    # 1. Удаление лишних символов в начале и конце
-    code = mermaid_code.strip()
+    # Удаляем HTML-теги
+    code = re.sub(r'<[^>]+>', '', mermaid_code)
+    code = code.strip()
     
-    # 2. Замена HTML-сущностей
+    # Декодируем HTML-сущности
     code = html.unescape(code)
     code = code.replace("&quot;", '"')
     code = code.replace("&amp;", "&")
-    code = code.replace("&lt;", "<")
-    code = code.replace("&gt;", ">")
     
     # 3. Удаление некорректных символов
     code = re.sub(r'[^a-zA-Z0-9\s_\-\[\]{}();"\'<>=]', '', code)
@@ -176,8 +166,8 @@ def fix_mermaid_syntax(mermaid_code: str) -> str:
             code = "graph TD\n" + code
     
     # 10. Упрощение диаграмм с большим количеством узлов
-    nodes = re.findall(r'\w+\[".*?"\]|\w+\(.*?\)|\w+\{.*?\}', code)
-    if len(nodes) > 10:
-        code = "graph TD\nA[Слишком сложная диаграмма]\nB[Упростите количество узлов]"
+    #nodes = re.findall(r'\w+\[".*?"\]|\w+\(.*?\)|\w+\{.*?\}', code)
+    #if len(nodes) > 10:
+        #code = "graph TD\nA[Слишком сложная диаграмма]\nB[Упростите количество узлов]"
     
     return code
