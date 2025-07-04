@@ -64,7 +64,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
         
             /* Базовые стили */
             body {
-                font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+                font-family: Arial, Helvetica, sans-serif;
                 line-height: 1.6;
                 color: #333;
                 background-color: #f8f9fa;
