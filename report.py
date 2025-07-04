@@ -281,22 +281,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 border-top: 1px solid #ecf0f1;
             }}
 
-            /* Адаптивность */
-            @media (max-width: 768px) {
-            .report {{
-                    padding: 20px;
-                    border-radius: 0;
-                    box-shadow: none;
-                }}
-        
-                body {{
-                    background-color: white;
-                }}
-        
-                h1 {{
-                    font-size: 1.8em;
-                }}
-            }
+            
             /* Стили для диаграмм */
             .diagram-wrapper {{
                 margin: 25px 0;
