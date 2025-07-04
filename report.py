@@ -18,10 +18,17 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
     <head>
         <meta charset="utf-8">
         <title>{title}</title>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"></script>
+        <!-- Загрузка Mermaid в правильном формате -->
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@11.0.1/dist/mermaid.min.js"></script>
         <script>
             // Инициализация Mermaid после полной загрузки страницы
-            window.addEventListener('load', function() {{
+            document.addEventListener('DOMContentLoaded', function() {{
+                // Проверка что Mermaid загрузился
+                if (typeof mermaid === 'undefined') {{
+                    console.error('Mermaid library not loaded!');
+                    return;
+               }}
+            
                 // Конфигурация Mermaid
                 mermaid.initialize({{
                     startOnLoad: true,
@@ -48,6 +55,9 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
             
                 // Принудительная перерисовка всех диаграмм
                 mermaid.run();
+            
+                // Логирование для отладки
+                console.log('Mermaid initialized successfully. Diagrams:', document.querySelectorAll('.mermaid').length);
             }});
         </script>
         <style>
@@ -73,6 +83,7 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 background-color: white;
                 padding: 15px;
                 border-radius: 6px;
+                white-space: pre-wrap; /* Сохраняем форматирование */
             }}
         
             .mermaid-error-container {{
@@ -86,7 +97,35 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 font-size: 14px;
             }}
         
-            /* Остальные стили остаются без изменений */
+            /* Остальные стили */
+            .report {{
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 20px;
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+            }}
+        
+            .report-header {{
+                background-color: #1976d2;
+                color: white;
+                padding: 20px;
+                border-radius: 8px 8px 0 0;
+                margin-bottom: 20px;
+            }}
+        
+            .content {{
+                padding: 20px;
+            }}
+        
+            .footer {{
+                text-align: center;
+                padding: 15px;
+                color: #757575;
+                font-size: 14px;
+                border-top: 1px solid #e0e0e0;
+                margin-top: 20px;
+            }}
         </style>
     </head>
     <body>
@@ -104,6 +143,20 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 Отчет сгенерирован автоматически
             </div>
         </div>
+    
+        <!-- Резервная загрузка Mermaid -->
+        <script>
+            if (typeof mermaid === 'undefined') {{
+                console.warn('Mermaid not loaded, loading now...');
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11.0.1/dist/mermaid.min.js';
+                script.onload = function() {{
+                    mermaid.initialize({{startOnLoad: true}});
+                    mermaid.run();
+                }};
+                document.head.appendChild(script);
+            }}
+        </script>
     </body>
     </html>
     """
@@ -166,7 +219,7 @@ def fix_mermaid_syntax(mermaid_code: str) -> str:
     code = code.replace("&amp;", "&")
     
     # Упрощаем сложные диаграммы
-    if len(code.split('\n')) > 20:
+    if len(code.split('\n')) > 35:
         return "graph TD\nA[Слишком сложная диаграмма]\nB[Упростите количество элементов]"
     
     # Исправляем основные синтаксические ошибки
