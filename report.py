@@ -73,130 +73,130 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 padding: 0;
             }
     
-            .report {
+            .report {{
                 max-width: 900px;
                 margin: 0 auto;
                 padding: 30px;
                 background-color: white;
                 box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
                 border-radius: 10px;
-            }
+            }}
 
             /* Заголовки */
-            h1 {
+            h1 {{
                 color: #2c3e50;
                 font-weight: 700;
                 border-bottom: 2px solid #3498db;
                 padding-bottom: 10px;
                 margin-top: 30px;
                 margin-bottom: 20px;
-            }
+            }}
 
-            h2 {
+            h2 {{
                 color: #2980b9;
                 font-weight: 600;
                 margin-top: 25px;
                 margin-bottom: 15px;
                 padding-bottom: 8px;
                 border-bottom: 1px solid #ecf0f1;
-            }
+            }}
 
-            h3 {
+            h3 {{
                 color: #3498db;
                 font-weight: 600;
                 margin-top: 20px;
                 margin-bottom: 12px;
-            }
+            }}
 
-            h4, h5, h6 {
+            h4, h5, h6 {{
                 color: #3498db;
                 font-weight: 500;
                 margin-top: 18px;
                 margin-bottom: 10px;
-            }
+            }}
 
             /* Текст и абзацы */
-            p {
+            p {{
                 margin-bottom: 15px;
                 text-align: justify;
-            }
+            }}
 
-            strong {
+            strong {{
                 color: #2c3e50;
                 font-weight: 600;
-            }
+            }}
 
-            em {
+            em {{
                 color: #7f8c8d;
                 font-style: italic;
-            }
+            }}
 
             /* Списки */
-            ul, ol {
+            ul, ol {{
                 margin-bottom: 20px;
                 padding-left: 25px;
-            }
+            }}
 
-            li {
+            li {{
                 margin-bottom: 8px;
                 position: relative;
-            }
+            }}
 
-            ul li::before {
+            ul li::before {{
                 content: "•";
                 color: #3498db;
                 font-weight: bold;
                 display: inline-block;
                 width: 1em;
                 margin-left: -1em;
-            }
+            }}
 
-            ol {
+            ol {{
                 counter-reset: list-counter;
-            }
+            }}
 
-            ol li {
+            ol li {{
                 counter-increment: list-counter;
-            }
+            }}
 
-            ol li::before {
+            ol li::before {{
                 content: counter(list-counter) ".";
                 color: #3498db;
                 font-weight: bold;
                 display: inline-block;
                 width: 1.5em;
                 margin-left: -1.5em;
-            }
+            }}
 
             /* Ссылки */
-            a {
+            a {{
                 color: #3498db;
                 text-decoration: none;
                 transition: color 0.3s;
                 border-bottom: 1px dotted rgba(52, 152, 219, 0.3);
-            }
+            }}
 
-            a:hover {
+            a:hover {{
                 color: #2980b9;
                 border-bottom: 1px solid #2980b9;
-            }
+            }}
 
             /* Цитаты */
-            blockquote {
+            blockquote {{
                 border-left: 4px solid #3498db;
                 background-color: #f8fafc;
                 padding: 15px 20px;
                 margin: 20px 0;
                 border-radius: 0 8px 8px 0;
                 color: #555;
-            }
+            }}
 
-            blockquote p {
+            blockquote p {{
                 margin-bottom: 0;
-            }
+            }}
 
             /* Код */
-            pre {
+            pre {{
                 background-color: #2c3e50;
                 color: #ecf0f1;
                 padding: 15px;
@@ -205,97 +205,97 @@ def create_html_report(content: str, title: str = "Отчет") -> bytes:
                 font-family: 'Fira Code', 'Consolas', monospace;
                 line-height: 1.5;
                 margin: 20px 0;
-            }
+            }}
 
-            code {
+            code {{
                 background-color: #f1f8ff;
                 color: #d63200;
                 padding: 2px 6px;
                 border-radius: 4px;
                 font-family: 'Fira Code', 'Consolas', monospace;
                 font-size: 0.95em;
-            }
+            }}
 
             /* Таблицы */
-            table {
+            table {{
                 width: 100%;
                 border-collapse: collapse;
                 margin: 20px 0;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
-            }
+            }}
 
-            th {
+            th {{
                 background-color: #3498db;
                 color: white;
                 font-weight: 600;
                 text-align: left;
                 padding: 12px 15px;
-            }
+            }}
 
-            td {
+            td {{
                 padding: 10px 15px;
                 border-bottom: 1px solid #ecf0f1;
-            }
+            }}
 
-            tr:nth-child(even) {
+            tr:nth-child(even) {{
                 background-color: #f8fafc;
-            }
+            }}
 
-            tr:hover {
+            tr:hover {{
                 background-color: #f0f7ff;
-            }
+            }}
 
             /* Изображения */
-            img {
+            img {{
                 max-width: 100%;
                 height: auto;
                 border-radius: 6px;
                 margin: 15px 0;
                 box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-            }
+            }}
 
             /* Разделители */
-            hr {
+            hr {{
                 border: 0;
                 height: 1px;
                 background: linear-gradient(to right, transparent, #3498db, transparent);
                 margin: 30px 0;
-            }
+            }}
 
             /* Подсветка важного */
-            .highlight {
+            .highlight {{
                 background: linear-gradient(120deg, rgba(52, 152, 219, 0.15), rgba(52, 152, 219, 0.05));
                 padding: 15px 20px;
                 border-radius: 8px;
                 border-left: 3px solid #3498db;
                 margin: 20px 0;
-            }
+            }}
 
             /* Футер */
-            .footer {
+            .footer {{
                 text-align: center;
                 margin-top: 40px;
                 padding-top: 20px;
                 color: #7f8c8d;
                 font-size: 0.9em;
                 border-top: 1px solid #ecf0f1;
-            }
+            }}
 
             /* Адаптивность */
             @media (max-width: 768px) {
-                .report {
+                .report {{
                     padding: 20px;
                     border-radius: 0;
                     box-shadow: none;
-                }
+                }}
         
-                body {
+                body {{
                     background-color: white;
-                }
+                }}
         
-                h1 {
+                h1 {{
                     font-size: 1.8em;
-                }
+                }}
             }
             /* Стили для диаграмм */
             .diagram-wrapper {{
