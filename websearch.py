@@ -35,7 +35,7 @@ class WebSearcher:
             self._search_bing_ru
         ]
 
-    def perform_search(self, queries: Union[str, List[str]], max_results: int = 3, full_text=True) -> List[Dict]:
+    def perform_search(self, queries: Union[str, List[str]], max_results: int = 1, full_text=True) -> List[Dict]:
         """Выполняет поиск по одному или нескольким запросам"""
         if isinstance(queries, str):
             queries = [queries]
