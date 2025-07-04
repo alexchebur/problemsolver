@@ -71,10 +71,11 @@ def convert_md_to_html(md_text: str) -> str:
         nonlocal block_id
         mermaid_code = match.group(1).strip()
         fixed_code = fix_mermaid_syntax(mermaid_code)
-        placeholder = f"%%%MERMAID_PLACEHOLDER_{block_id}%%%"
+        placeholder = f"%%%MERMAID_BLOCK_{block_id}%%%"
         mermaid_blocks[placeholder] = fixed_code
         block_id += 1
-        return f"\n\n{placeholder}\n\n"  # Отделяем пустыми строками
+        # Возвращаем блок как отдельный элемент (без оборачивания в p)
+        return f"\n\n{placeholder}\n\n"
 
     # Заменяем блоки Mermaid на плейсхолдеры
     text_with_placeholders = re.sub(
@@ -97,17 +98,28 @@ def convert_md_to_html(md_text: str) -> str:
     
     # Заменяем плейсхолдеры на финальные блоки Mermaid
     for placeholder, fixed_code in mermaid_blocks.items():
+        # Извлекаем цифровой ID из плейсхолдера
+        mermaid_id = placeholder.split('_')[-1].strip('%%%')
+        
         mermaid_html = f"""
-        <div class="diagram-wrapper">
-            <div class="mermaid-container">
-                <script type="text/mermaid" id="mermaid-{placeholder}">
-                    {fixed_code}
-                </script>
-                <div id="mermaid-error-mermaid-{placeholder}"></div>
-            </div>
-        </div>
+<div class="diagram-wrapper">
+    <div class="mermaid-container">
+        <script type="text/mermaid" id="mermaid-{mermaid_id}">
+            {fixed_code}
+        </script>
+        <div id="mermaid-error-{mermaid_id}" class="mermaid-error-container"></div>
+    </div>
+</div>
         """
         html_content = html_content.replace(placeholder, mermaid_html)
+    
+    # Удаляем возможные обертки параграфов вокруг диаграмм
+    html_content = re.sub(
+        r'<p>\s*(<div class="diagram-wrapper">.*?</div>)\s*</p>',
+        r'\1',
+        html_content,
+        flags=re.DOTALL
+    )
     
     return html_content
 
@@ -121,53 +133,18 @@ def fix_mermaid_syntax(mermaid_code: str) -> str:
     code = html.unescape(code)
     code = code.replace("&quot;", '"')
     code = code.replace("&amp;", "&")
+    code = code.replace("&lt;", "<")
+    code = code.replace("&gt;", ">")
     
-    # 3. Удаление некорректных символов
-    code = re.sub(r'[^a-zA-Z0-9\s_\-\[\]{}();"\'<>=]', '', code)
+    # Упрощаем сложные диаграммы
+    if len(code.split('\n')) > 15:
+        return "graph TD\nA[Слишком сложная диаграмма]\nB[Упростите количество узлов]"
     
-    # 4. Завершение незавершенных команд
-    if not code.endswith(';') and not code.endswith(']') and not code.endswith('}'):
-        code += ';'
-    
-    # 5. Добавление точек с запятой в конце команд
-    lines = []
-    for line in code.split('\n'):
-        line = line.strip()
-        if line:
-            # Добавляем точку с запятой, если ее нет
-            if not line.endswith(';') and '-->' in line:
-                line += ';'
-            lines.append(line)
-    code = '\n'.join(lines)
-    
-    # 6. Завершение незакрытых узлов
-    if '"' in code:
-        open_quotes = code.count('"')
-        if open_quotes % 2 != 0:
-            code += '"'
-    
-    # 7. Проверка и завершение узлов
-    def complete_nodes(match):
-        node_text = match.group(1)
-        return f'["{node_text.strip()}"]'
-    
-    code = re.sub(r'\["([^"]*)$', complete_nodes, code)
-    
-    # 8. Замена пустых узлов
-    code = re.sub(r'\["\s*"\]', '["Не указано"]', code)
-    code = re.sub(r'\(\s*\)', '("Не указано")', code)
-    code = re.sub(r'\{\s*\}', '{"Не указано"}', code)
-    
-    # 9. Добавление ориентации по умолчанию
+    # Добавляем базовую ориентацию если отсутствует
     if not re.search(r'^\s*(graph|flowchart)\s+[A-Z]{2}', code):
         if "graph" in code or "flowchart" in code:
             code = re.sub(r'(graph|flowchart)\s+', r'\1 TD\n', code)
         else:
             code = "graph TD\n" + code
-    
-    # 10. Упрощение диаграмм с большим количеством узлов
-    #nodes = re.findall(r'\w+\[".*?"\]|\w+\(.*?\)|\w+\{.*?\}', code)
-    #if len(nodes) > 10:
-        #code = "graph TD\nA[Слишком сложная диаграмма]\nB[Упростите количество узлов]"
     
     return code
