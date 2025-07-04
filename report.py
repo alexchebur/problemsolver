@@ -7,7 +7,7 @@ import base64
 import logging
 
 # Настройка логирования
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) 
 
 def create_html_report(content: str, title: str = "Отчет") -> bytes:
     """Создает HTML отчет с полной поддержкой Markdown и Mermaid.js"""
