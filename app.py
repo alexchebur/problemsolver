@@ -49,7 +49,8 @@ if 'search_results' not in st.session_state:
     st.session_state.search_results = ""
 
 # Модель
-model = genai.GenerativeModel('gemini-2.0-flash')
+#model = genai.GenerativeModel('gemini-2.0-flash')
+model = genai.GenerativeModel('Gemini 2.5 Flash-Lite Preview 06-17')
 
 # Когнитивные методики
 CORE_METHODS = [
