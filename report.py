@@ -139,7 +139,8 @@ def fix_mermaid_syntax(mermaid_code: str) -> str:
     code = re.sub(r'(\w+)\s*\["([^"]*)"\]', r'\1["\2"]', code)  # Квадратные скобки
     code = re.sub(r'(\w+)\s*\("([^"]*)"\)', r'\1("\2")', code)  # Круглые скобки
     code = re.sub(r'(\w+)\s*\{"([^"]*)"\}', r'\1{"\2"}', code)  # Фигурные скобки
-    
+    code = re.sub(r'(\w+)\s+&\s+(\w+)', r'\1 & \2', code) # сохраняем символ &
+
     # Добавляем базовую ориентацию если отсутствует
     if not re.search(r'^\s*(graph|flowchart)\s+[A-Z]{2}', code, re.IGNORECASE):
         if re.search(r'(graph|flowchart)', code, re.IGNORECASE):
