@@ -6,16 +6,13 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.0.1/dist/mermaid.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            if (typeof mermaid === 'undefined') {
-                console.error('Mermaid library not loaded!');
-                return;
-            }
+            if (typeof mermaid === 'undefined') return;
             
             mermaid.initialize({
                 startOnLoad: true,
                 theme: 'default',
                 securityLevel: 'loose',
-                fontFamily: 'Arial, sans-serif',
+                fontFamily: 'sans-serif',
                 errorRenderer: function(error) {
                     try {
                         const container = error.element.closest('.mermaid-container')
@@ -28,18 +25,15 @@
                                 </div>
                             `;
                         }
-                    } catch (e) {
-                        console.error('Mermaid error handling failed:', e);
-                    }
+                    } catch (e) {}
                 }
             });
             mermaid.run();
         });
     </script>
     <style>
-        /* Безопасные системные шрифты */
         body {
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: sans-serif;
             line-height: 1.6;
             color: #333;
             background-color: #f8f9fa;
@@ -52,214 +46,31 @@
             margin: 0 auto;
             padding: 30px;
             background-color: white;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
-            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
         }
 
-        h1 {
-            color: #2c3e50;
-            font-weight: bold;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-            margin-top: 30px;
-            margin-bottom: 20px;
-        }
-
-        h2 {
-            color: #2980b9;
-            font-weight: bold;
-            margin-top: 25px;
-            margin-bottom: 15px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #ecf0f1;
-        }
-
-        h3 {
-            color: #3498db;
-            font-weight: bold;
-            margin-top: 20px;
-            margin-bottom: 12px;
-        }
-
-        h4, h5, h6 {
-            color: #3498db;
-            font-weight: bold;
-            margin-top: 18px;
-            margin-bottom: 10px;
-        }
-
-        p {
-            margin-bottom: 15px;
-            text-align: justify;
-        }
-
-        strong {
-            color: #2c3e50;
-            font-weight: bold;
-        }
-
-        em {
-            color: #7f8c8d;
-            font-style: italic;
-        }
-
-        ul, ol {
-            margin-bottom: 20px;
-            padding-left: 25px;
-        }
-
-        li {
-            margin-bottom: 8px;
-            position: relative;
-        }
-
-        ul li::before {
-            content: "•";
-            color: #3498db;
-            font-weight: bold;
-            display: inline-block;
-            width: 1em;
-            margin-left: -1em;
-        }
-
-        ol {
-            counter-reset: list-counter;
-        }
-
-        ol li {
-            counter-increment: list-counter;
-        }
-
-        ol li::before {
-            content: counter(list-counter) ".";
-            color: #3498db;
-            font-weight: bold;
-            display: inline-block;
-            width: 1.5em;
-            margin-left: -1.5em;
-        }
-
-        a {
-            color: #3498db;
-            text-decoration: none;
-            transition: color 0.3s;
-            border-bottom: 1px dotted rgba(52, 152, 219, 0.3);
-        }
-
-        a:hover {
-            color: #2980b9;
-            border-bottom: 1px solid #2980b9;
-        }
-
-        blockquote {
-            border-left: 4px solid #3498db;
-            background-color: #f8fafc;
-            padding: 15px 20px;
-            margin: 20px 0;
-            border-radius: 0 8px 8px 0;
-            color: #555;
-        }
-
-        blockquote p {
-            margin-bottom: 0;
-        }
-
-        pre {
-            background-color: #2c3e50;
-            color: #ecf0f1;
-            padding: 15px;
-            border-radius: 6px;
-            overflow-x: auto;
-            font-family: monospace;
-            line-height: 1.5;
-            margin: 20px 0;
-        }
-
-        code {
-            background-color: #f1f8ff;
-            color: #d63200;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 0.95em;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
-        }
-
-        th {
-            background-color: #3498db;
+        .report-header {
+            background-color: #1976d2;
             color: white;
-            font-weight: bold;
-            text-align: left;
-            padding: 12px 15px;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 20px;
         }
 
-        td {
-            padding: 10px 15px;
-            border-bottom: 1px solid #ecf0f1;
-        }
-
-        tr:nth-child(even) {
-            background-color: #f8fafc;
-        }
-
-        tr:hover {
-            background-color: #f0f7ff;
-        }
-
-        img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 6px;
-            margin: 15px 0;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        hr {
-            border: 0;
-            height: 1px;
-            background: linear-gradient(to right, transparent, #3498db, transparent);
-            margin: 30px 0;
-        }
-
-        .highlight {
-            background: linear-gradient(120deg, rgba(52, 152, 219, 0.15), rgba(52, 152, 219, 0.05));
-            padding: 15px 20px;
-            border-radius: 8px;
-            border-left: 3px solid #3498db;
-            margin: 20px 0;
+        .content {
+            padding: 20px;
         }
 
         .footer {
             text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            color: #7f8c8d;
+            padding: 15px;
+            color: #757575;
             font-size: 0.9em;
-            border-top: 1px solid #ecf0f1;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 20px;
         }
 
-        @media (max-width: 768px) {
-            .report {
-                padding: 20px;
-                border-radius: 0;
-                box-shadow: none;
-            }
-    
-            body {
-                background-color: white;
-            }
-    
-            h1 {
-                font-size: 1.8em;
-            }
-        }
-
+        /* Стили для диаграмм */
         .diagram-wrapper {
             margin: 25px 0;
             padding: 15px;
@@ -270,18 +81,13 @@
     
         .mermaid-container {
             overflow-x: auto;
-            min-height: 150px;
         }
     
         .mermaid {
             min-width: 100%;
-            display: flex;
-            justify-content: center;
-            font-family: Arial, sans-serif;
             background-color: white;
             padding: 15px;
             border-radius: 6px;
-            white-space: pre-wrap;
         }
     
         .mermaid-error-container {
@@ -291,20 +97,7 @@
             border-radius: 6px;
             margin-top: 10px;
             font-family: monospace;
-            white-space: pre-wrap;
             font-size: 14px;
-        }
-    
-        .report-header {
-            background-color: #1976d2;
-            color: white;
-            padding: 20px;
-            border-radius: 8px 8px 0 0;
-            margin-bottom: 20px;
-        }
-    
-        .content {
-            padding: 20px;
         }
     </style>
 </head>
@@ -326,7 +119,6 @@
 
     <script>
         if (typeof mermaid === 'undefined') {
-            console.warn('Mermaid not loaded, loading now...');
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11.0.1/dist/mermaid.min.js';
             script.onload = function() {
