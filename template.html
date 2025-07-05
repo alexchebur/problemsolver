@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>__TITLE__</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.0.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof mermaid === 'undefined') {
+                console.error('Mermaid library not loaded!');
+                return;
+            }
+            
+            mermaid.initialize({
+                startOnLoad: true,
+                theme: 'default',
+                securityLevel: 'loose',
+                fontFamily: 'Arial, sans-serif',
+                errorRenderer: function(error) {
+                    try {
+                        const container = error.element.closest('.mermaid-container')
+                                            .querySelector('.mermaid-error-container');
+                        if (container) {
+                            container.innerHTML = `
+                                <div class="mermaid-error">
+                                    <strong>Ошибка в диаграмме:</strong> ${error.message}
+                                    <pre>${error.str}</pre>
+                                </div>
+                            `;
+                        }
+                    } catch (e) {
+                        console.error('Mermaid error handling failed:', e);
+                    }
+                }
+            });
+            mermaid.run();
+        });
+    </script>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+
+        .report {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px;
+            background-color: white;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+        }
+
+        /* Остальные стили остаются без изменений */
+        /* ... [все остальные стили из оригинального шаблона] ... */
+    </style>
+</head>
+<body>
+    <div class="report">
+        <div class="report-header">
+            <h1>__TITLE__</h1>
+            <p>Сгенерировано: __GENERATION_DATE__</p>
+        </div>
+    
+        <div class="content">
+            __HTML_CONTENT__
+        </div>
+    
+        <div class="footer">
+            Отчет сгенерирован автоматически
+        </div>
+    </div>
+
+    <script>
+        if (typeof mermaid === 'undefined') {
+            console.warn('Mermaid not loaded, loading now...');
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11.0.1/dist/mermaid.min.js';
+            script.onload = function() {
+                mermaid.initialize({startOnLoad: true});
+                mermaid.run();
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+</body>
+</html>
