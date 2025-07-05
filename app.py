@@ -516,7 +516,8 @@ def generate_response():
             analysis_context = (
                 f"Проблема: {st.session_state.problem_formulation}\n"
                 f"Анализ методик:\n"
-                + "\n\n".join([f"{method}:\n{result}" for method, result in method_results.items()])
+                + "\n\n".join([f"{method}:\n{result}" for method, result in method_results.items()]) +
+                f"\n\nРезультаты уточняющего поиска:\n{refinement_search_results}"
             )
             
             conclusions = generate_final_conclusions(
