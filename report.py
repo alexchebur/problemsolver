@@ -43,21 +43,39 @@ def load_template():
 
 def create_html_report(content: str, title: str = "Отчет") -> bytes:
     """Создает HTML отчет с полной поддержкой Markdown и Mermaid.js"""
-    # Загружаем шаблон
-    html_template = load_template()
+    try:
+        # Загружаем шаблон
+        html_template = load_template()
+        
+        # Генерируем HTML контент
+        html_content = convert_md_to_html(content)
+        generation_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        # Заменяем плейсхолдеры
+        html_template = html_template \
+            .replace("__TITLE__", html.escape(title)) \
+            .replace("__GENERATION_DATE__", html.escape(generation_date)) \
+            .replace("__HTML_CONTENT__", html_content)
+        
+        return html_template.encode('utf-8')
     
-    # Генерируем HTML контент
-    html_content = convert_md_to_html(content)
-    generation_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
-    # Заменяем плейсхолдеры в шаблоне
-    html_template = html_template \
-        .replace("__TITLE__", title) \
-        .replace("__GENERATION_DATE__", generation_date) \
-        .replace("__HTML_CONTENT__", html_content)
-    
-    return html_template.encode('utf-8')
-
+    except Exception as e:
+        logging.error(f"Ошибка при создании HTML: {str(e)}")
+        # Возвращаем минимальный работающий HTML
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Отчет</title>
+        </head>
+        <body>
+            <h1>{html.escape(title)}</h1>
+            <p>Ошибка при генерации отчета: {html.escape(str(e))}</p>
+            <pre>{html.escape(content[:5000])}</pre>
+        </body>
+        </html>
+        """.encode('utf-8')
 def convert_md_to_html(md_text: str) -> str:
     """Конвертирует Markdown в HTML с сохранением блоков Mermaid"""
     # Обрабатываем блоки Mermaid отдельно
