@@ -597,7 +597,7 @@ if st.session_state.report_content and not st.session_state.processing:
     
     # Текстовый экспорт
     b64_txt = base64.b64encode(st.session_state.report_content.encode()).decode()
-    txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT отчет</a>'
+    txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT Markdown отчет</a>'
     st.markdown(txt_href, unsafe_allow_html=True)
     
     # HTML экспорт
