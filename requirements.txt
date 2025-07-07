@@ -17,6 +17,6 @@
    PyPDF2
    python-pptx
    pandas
-   mathplotlib
+   matplotlib
    
 
