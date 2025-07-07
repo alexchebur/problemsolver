@@ -292,7 +292,7 @@ def convert_uploaded_file_to_markdown(uploaded_file, for_analysis: bool = False)
     except Exception as e:
         return None
 
-def convert_excel_to_markdown_for_analysis(file_content: bytes, max_rows: int = 500) -> str:
+def convert_excel_to_markdown_for_analysis(file_content: bytes, max_rows: int = 100) -> str:
     try:
         excel_io = io.BytesIO(file_content)
         workbook = load_workbook(excel_io, data_only=True)
