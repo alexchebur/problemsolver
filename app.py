@@ -52,6 +52,9 @@ if 'search_results' not in st.session_state:
     st.session_state.search_results = ""
 if 'internal_dialog' not in st.session_state:
     st.session_state.internal_dialog = ""
+# Добавляем новое состояние для анализа временных рядов
+if 'time_series_analysis' not in st.session_state:
+    st.session_state.time_series_analysis = None
 
 # Модель
 model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-06-17')
@@ -90,25 +93,29 @@ CONTEXT_CONFIG = {
         'doc_text': True,
         'original_query': True,
         'search_results': False,
-        'method_results': False
+        'method_results': False,
+        'time_series': False  # Новое поле
     },
     'cognitive_method': {
         'doc_text': True,
         'original_query': True,
         'search_results': True,
-        'method_results': False
+        'method_results': False,
+        'time_series': True   # Новое поле
     },
     'refinement_queries': {
         'doc_text': False,
         'original_query': True,
         'search_results': True,
-        'method_results': True
+        'method_results': True,
+        'time_series': True   # Новое поле
     },
     'final_conclusions': {
         'doc_text': False,
         'original_query': True,
         'search_results': True,
-        'method_results': True
+        'method_results': True,
+        'time_series': True   # Новое поле
     }
 }
 
@@ -134,6 +141,10 @@ def build_context(context_type: str) -> str:
             [f"{method}:\n{result}" for method, result in st.session_state.method_results.items()]
         )
         context_parts.append(f"Анализ методик: {method_results[:10000]}")
+    
+    # Добавляем анализ временных рядов в контекст
+    if config['time_series'] and st.session_state.time_series_analysis:
+        context_parts.append(f"Анализ временных рядов: {st.session_state.time_series_analysis}")
     
     return "\n\n".join(context_parts)
 
@@ -474,6 +485,7 @@ with col2:
         key="temperature"
     )
 
+# Основной загрузчик файлов
 uploaded_file = st.file_uploader(
     "Загрузите файл с дополнительным контекстом (DOCX, XLSX, PPTX, PDF):",
     type=["docx", "xlsx", "pptx", "pdf"],
@@ -488,6 +500,42 @@ if uploaded_file:
     else:
         st.error("🚨 Unsupported file type or conversion error")
         st.session_state.current_doc_text = ""
+
+# Новый загрузчик для временных рядов
+st.markdown("---")
+st.subheader("Анализ временных рядов")
+time_series_file = st.file_uploader(
+    "Загрузите файл XLSX с временными рядами для анализа:",
+    type=["xlsx"],
+    key="time_series_file"
+)
+
+if st.button("Анализировать числовые данные", key="analyze_ts_button"):
+    if time_series_file is not None:
+        markdown_data = convert_uploaded_file_to_markdown(time_series_file)
+        if markdown_data:
+            # Сохраняем сырые данные для возможного отображения
+            st.session_state.time_series_raw = markdown_data
+            
+            # Запускаем анализ
+            with st.spinner("🔢 Анализирую временные ряды..."):
+                analysis_result = analyze_time_series(markdown_data)
+                st.session_state.time_series_analysis = analysis_result
+            
+            st.success("✅ Анализ временных рядов завершен!")
+            
+            # Показываем результаты анализа
+            st.subheader("Результат анализа временных рядов")
+            st.write(analysis_result)
+            
+            # Показываем сырые данные по запросу
+            if st.checkbox("Показать исходные данные"):
+                st.subheader("Исходные данные временных рядов")
+                st.markdown(markdown_data)
+        else:
+            st.error("Ошибка конвертации файла.")
+    else:
+        st.warning("Пожалуйста, загрузите файл XLSX.")
 
 if st.button("Сгенерировать решение", disabled=st.session_state.processing):
     generate_response()
