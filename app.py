@@ -552,6 +552,10 @@ if uploaded_file:
         st.error("🚨 Unsupported file type or conversion error")
         st.session_state.current_doc_text = ""
 
+if st.button("Сгенерировать решение", disabled=st.session_state.processing):
+    generate_response()
+
+
 # Новый загрузчик для временных рядов
 st.markdown("---")
 st.subheader("Анализ рядов данных (опциональное дополнение к рассуждениям)")
@@ -567,6 +571,7 @@ if time_series_file is not None:
         try:
             df = pd.read_excel(time_series_file)
             st.dataframe(df.head(10))
+            st.write("Доступные столбцы:", df.dtypes)
             
             # Преобразуем все возможные числовые столбцы
             for col in df.columns:
@@ -648,8 +653,8 @@ if st.session_state.get('time_series_raw') and st.checkbox("Показать и�
     except Exception as e:
         st.error(f"Ошибка при отображении данных: {str(e)}")
 
-if st.button("Сгенерировать решение", disabled=st.session_state.processing):
-    generate_response()
+#if st.button("Сгенерировать решение", disabled=st.session_state.processing):
+#    generate_response()
 
 if st.session_state.report_content and not st.session_state.processing:
     st.divider()
