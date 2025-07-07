@@ -130,6 +130,12 @@ def fix_mermaid_syntax(mermaid_code: str) -> str:
     code = html.unescape(code)
     code = code.replace("&quot;", '"')
     code = code.replace("&amp;", "&")
+
+    # Заменяем точки на пробелы ТОЛЬКО в текстовых метках узлов
+    # Обрабатываем все типы нотаций: ["..."], ("..."), {...}
+    code = re.sub(r'(\[|\(|\{)"([^"]*)\.([^"]*)"(\\|$)', 
+                 lambda m: f'{m.group(1)}"{m.group(2)} {m.group(3)}"{m.group(4)}', 
+                 code)
     
     # Упрощаем сложные диаграммы
     if len(code.split('\n')) > 35:
