@@ -18,7 +18,10 @@ from prompts import (
     PROMPT_GENERATE_REFINEMENT_QUERIES,
     PROMPT_GENERATE_FINAL_CONCLUSIONS
 )
-from converters import convert_uploaded_file_to_markdown
+from converters import (
+    convert_uploaded_file_to_markdown, 
+    convert_excel_to_markdown_for_analysis  # Добавьте эту строку
+)
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
