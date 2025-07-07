@@ -143,7 +143,7 @@ def formulate_problem_and_queries():
     
     prompt = PROMPT_FORMULATE_PROBLEM_AND_QUERIES.format(
         query=st.session_state.input_query.strip(),
-        doc_text=st.session_state.current_doc_text[:300000] if st.session_state.current_doc_text else "Нет документа"
+        doc_text=st.session_state.current_doc_text[:200000] if st.session_state.current_doc_text else "Нет документа"
     )
     
     try:
