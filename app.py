@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import google.generativeai as genai
 import time
@@ -23,6 +21,11 @@ from prompts import (
     PROMPT_GENERATE_REFINEMENT_QUERIES,
     PROMPT_GENERATE_FINAL_CONCLUSIONS
 )
+import io
+import pandas as pd
+from pptx import Presentation
+import PyPDF2
+from openpyxl import load_workbook
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
@@ -58,7 +61,6 @@ if 'internal_dialog' not in st.session_state:
     st.session_state.internal_dialog = ""
 
 # Модель
-#model = genai.GenerativeModel('gemini-2.0-flash')
 model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-06-17')
 
 # Когнитивные методики
@@ -117,21 +119,307 @@ CONTEXT_CONFIG = {
     }
 }
 
+class WordToMarkdown:
+    """Converter for Word documents to Markdown"""
+    
+    def convert(self, file_content):
+        """Convert Word document content to Markdown"""
+        doc = Document(io.BytesIO(file_content))
+        markdown_content = []
+        
+        for paragraph in doc.paragraphs:
+            text = paragraph.text.strip()
+            if not text:
+                markdown_content.append("")
+                continue
+            
+            style_name = paragraph.style.name.lower()
+            if 'heading' in style_name:
+                if 'heading 1' in style_name:
+                    markdown_content.append(f"# {text}")
+                elif 'heading 2' in style_name:
+                    markdown_content.append(f"## {text}")
+                elif 'heading 3' in style_name:
+                    markdown_content.append(f"### {text}")
+                elif 'heading 4' in style_name:
+                    markdown_content.append(f"#### {text}")
+                elif 'heading 5' in style_name:
+                    markdown_content.append(f"##### {text}")
+                else:
+                    markdown_content.append(f"###### {text}")
+            else:
+                formatted_text = self._format_text_runs(paragraph)
+                markdown_content.append(formatted_text)
+        
+        for table in doc.tables:
+            table_md = self._convert_table(table)
+            markdown_content.append(table_md)
+        
+        return "\n\n".join(markdown_content)
+    
+    def _format_text_runs(self, paragraph):
+        formatted_text = ""
+        for run in paragraph.runs:
+            text = run.text
+            if run.bold and run.italic:
+                text = f"***{text}***"
+            elif run.bold:
+                text = f"**{text}**"
+            elif run.italic:
+                text = f"*{text}*"
+            formatted_text += text
+        return formatted_text
+    
+    def _convert_table(self, table):
+        markdown_table = []
+        table_data = []
+        for row in table.rows:
+            row_data = []
+            for cell in row.cells:
+                cell_text = cell.text.strip().replace('\n', ' ')
+                row_data.append(cell_text)
+            table_data.append(row_data)
+        
+        if not table_data:
+            return ""
+        
+        header_row = "| " + " | ".join(table_data[0]) + " |"
+        markdown_table.append(header_row)
+        separator = "| " + " | ".join(["---"] * len(table_data[0])) + " |"
+        markdown_table.append(separator)
+        
+        for row in table_data[1:]:
+            data_row = "| " + " | ".join(row) + " |"
+            markdown_table.append(data_row)
+        
+        return "\n".join(markdown_table)
+
+class ExcelToMarkdown:
+    """Converter for Excel files to Markdown"""
+    
+    def convert(self, file_content):
+        excel_io = io.BytesIO(file_content)
+        workbook = load_workbook(excel_io, data_only=True)
+        markdown_content = []
+        
+        for sheet_name in workbook.sheetnames:
+            worksheet = workbook[sheet_name]
+            markdown_content.append(f"# {sheet_name}")
+            markdown_content.append("")
+            
+            data = []
+            for row in worksheet.iter_rows(values_only=True):
+                if any(cell is not None and str(cell).strip() for cell in row):
+                    clean_row = []
+                    for cell in row:
+                        if cell is None:
+                            clean_row.append("")
+                        else:
+                            cell_value = str(cell).strip()
+                            clean_row.append(cell_value)
+                    data.append(clean_row)
+            
+            if data:
+                table_md = self._create_markdown_table(data)
+                markdown_content.append(table_md)
+            else:
+                markdown_content.append("*No data in this worksheet*")
+            
+            markdown_content.append("")
+        
+        return "\n".join(markdown_content)
+    
+    def _create_markdown_table(self, data):
+        if not data:
+            return ""
+        
+        max_cols = max(len(row) for row in data)
+        padded_data = []
+        for row in data:
+            padded_row = row + [""] * (max_cols - len(row))
+            padded_data.append(padded_row)
+        
+        markdown_table = []
+        
+        if padded_data:
+            header_row = "| " + " | ".join(padded_data[0]) + " |"
+            markdown_table.append(header_row)
+            separator = "| " + " | ".join(["---"] * max_cols) + " |"
+            markdown_table.append(separator)
+            
+            for row in padded_data[1:]:
+                data_row = "| " + " | ".join(row) + " |"
+                markdown_table.append(data_row)
+        
+        return "\n".join(markdown_table)
+
+class PowerPointToMarkdown:
+    """Converter for PowerPoint presentations to Markdown"""
+    
+    def convert(self, file_content):
+        ppt_io = io.BytesIO(file_content)
+        presentation = Presentation(ppt_io)
+        markdown_content = ["# PowerPoint Presentation", ""]
+        
+        for slide_num, slide in enumerate(presentation.slides, 1):
+            markdown_content.append(f"## Slide {slide_num}")
+            markdown_content.append("")
+            
+            slide_text = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    text_content = shape.text.strip()
+                    if not slide_text and self._is_likely_title(shape):
+                        slide_text.append(f"### {text_content}")
+                    else:
+                        paragraphs = text_content.split('\n')
+                        for para in paragraphs:
+                            para = para.strip()
+                            if para:
+                                if para.startswith(('•', '-', '*')) or para[0:2] in ['1.', '2.', '3.', '4.', '5.']:
+                                    slide_text.append(f"- {para.lstrip('•-* ')}")
+                                else:
+                                    slide_text.append(para)
+                
+                elif hasattr(shape, "table"):
+                    table_md = self._convert_ppt_table(shape.table)
+                    if table_md:
+                        slide_text.append(table_md)
+            
+            if slide_text:
+                markdown_content.extend(slide_text)
+            else:
+                markdown_content.append("*No text content in this slide*")
+            
+            markdown_content.append("")
+        
+        return "\n".join(markdown_content)
+    
+    def _is_likely_title(self, shape):
+        try:
+            if hasattr(shape, 'top') and shape.top < 1000000:
+                return True
+        except:
+            pass
+        return False
+    
+    def _convert_ppt_table(self, table):
+        markdown_table = []
+        table_data = []
+        
+        for row in table.rows:
+            row_data = []
+            for cell in row.cells:
+                cell_text = cell.text.strip().replace('\n', ' ')
+                row_data.append(cell_text)
+            table_data.append(row_data)
+        
+        if not table_data:
+            return ""
+        
+        if table_data:
+            header_row = "| " + " | ".join(table_data[0]) + " |"
+            markdown_table.append(header_row)
+            separator = "| " + " | ".join(["---"] * len(table_data[0])) + " |"
+            markdown_table.append(separator)
+            
+            for row in table_data[1:]:
+                data_row = "| " + " | ".join(row) + " |"
+                markdown_table.append(data_row)
+        
+        return "\n".join(markdown_table)
+
+class PDFToMarkdown:
+    """Converter for PDF documents to Markdown"""
+    
+    def convert(self, file_content):
+        pdf_io = io.BytesIO(file_content)
+        pdf_reader = PyPDF2.PdfReader(pdf_io)
+        markdown_content = ["# PDF Document", ""]
+        
+        for page_num, page in enumerate(pdf_reader.pages, 1):
+            markdown_content.append(f"## Page {page_num}")
+            markdown_content.append("")
+            
+            try:
+                page_text = page.extract_text()
+                if page_text.strip():
+                    cleaned_text = self._clean_pdf_text(page_text)
+                    paragraphs = cleaned_text.split('\n\n')
+                    
+                    for paragraph in paragraphs:
+                        paragraph = paragraph.strip()
+                        if paragraph:
+                            if self._is_likely_heading(paragraph):
+                                markdown_content.append(f"### {paragraph}")
+                            else:
+                                markdown_content.append(paragraph)
+                            markdown_content.append("")
+                else:
+                    markdown_content.append("*No text content found on this page*")
+                    markdown_content.append("")
+                    
+            except Exception as e:
+                markdown_content.append(f"*Error extracting text from page {page_num}: {str(e)}*")
+                markdown_content.append("")
+        
+        return "\n".join(markdown_content)
+    
+    def _clean_pdf_text(self, text):
+        if not text:
+            return ""
+        
+        cleaned = ' '.join(text.split())
+        cleaned = re.sub(r'([.!?])\s+([A-Z][a-z])', r'\1\n\n\2', cleaned)
+        cleaned = re.sub(r'\s*([•·▪▫‣⁃])\s*', r'\n- ', cleaned)
+        cleaned = re.sub(r'\s*(\d+\.)\s+', r'\n\1 ', cleaned)
+        return cleaned
+    
+    def _is_likely_heading(self, text):
+        if len(text) < 100 and (
+            text.isupper() or
+            (len(text.split()) <= 8 and text.count('.') == 0)
+        ):
+            return True
+        return False
+
+class ConverterFactory:
+    @staticmethod
+    def get_converter(file_type):
+        converters = {
+            'docx': WordToMarkdown(),
+            'xlsx': ExcelToMarkdown(),
+            'pptx': PowerPointToMarkdown(),
+            'pdf': PDFToMarkdown()
+        }
+        return converters.get(file_type)
+
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
 
-def parse_docx(uploaded_file):
+def parse_uploaded_file(uploaded_file):
+    """Parse uploaded file and convert to Markdown"""
     try:
         if uploaded_file is None:
             return False
 
-        doc = Document(BytesIO(uploaded_file.getvalue()))
-        full_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-        st.session_state.current_doc_text = full_text[:300000]
-        st.success(f"📂 Документ загружен: {len(st.session_state.current_doc_text)} символов")
+        file_name = uploaded_file.name.lower()
+        file_extension = file_name.split('.')[-1]
+        
+        converter = ConverterFactory.get_converter(file_extension)
+        if not converter:
+            st.error(f"🚨 Unsupported file type: {file_extension}")
+            return False
+
+        file_content = uploaded_file.getvalue()
+        markdown_content = converter.convert(file_content)
+        
+        st.session_state.current_doc_text = markdown_content[:300000]
+        st.success(f"📂 Document converted: {len(st.session_state.current_doc_text)} characters")
         return True
+
     except Exception as e:
-        st.error(f"🚨 Ошибка загрузки: {str(e)}")
+        st.error(f"🚨 Conversion error: {str(e)}")
         st.session_state.current_doc_text = ""
         return False
 
@@ -244,7 +532,7 @@ def generate_refinement_queries() -> List[str]:
     context = build_context('refinement_queries')
     
     prompt = PROMPT_GENERATE_REFINEMENT_QUERIES.format(
-        context=context[:100000]  # Ограничиваем длину контекста
+        context=context[:100000]
     )
     
     try:
@@ -276,7 +564,7 @@ def generate_final_conclusions() -> str:
     
     prompt = PROMPT_GENERATE_FINAL_CONCLUSIONS.format(
         problem_formulation=st.session_state.problem_formulation,
-        analysis_context=context[:100000]  # Ограничиваем длину контекста
+        analysis_context=context[:100000]
     )
     
     try:
@@ -299,7 +587,6 @@ def generate_response():
     progress_bar = st.progress(0)
 
     try:
-        # Проверка сетевой доступности
         try:
             test_response = requests.get("https://www.google.com", timeout=10)
             st.info(f"Сетевая доступность: {'OK' if test_response.status_code == 200 else 'Проблемы'}")
@@ -311,15 +598,12 @@ def generate_response():
             status_area.warning("⚠️ Введите запрос")
             return
 
-        # Этап 1: Формулирование проблемы и генерация запросов
         status_area.info("🔍 Формулирую проблему и генерирую поисковые запросы...")
         problem_result, queries = formulate_problem_and_queries()
-        # Проверка и резервный исходный запрос
         if not queries:
-            queries = [query]  # query - исходный запрос пользователя
+            queries = [query]
             st.warning("⚠️ Использован исходный запрос для поиска (LLM не сгенерировал запросы)")
         
-        # Вывод рассуждений в боковую панель
         if st.session_state.internal_dialog:
             st.sidebar.subheader("🧠 Рассуждения ИИ")
             st.sidebar.text_area(
@@ -331,7 +615,6 @@ def generate_response():
         else:
             st.sidebar.warning("Рассуждения не были сгенерированы")
         
-        # Основной контейнер для этапа 1
         with st.expander("✅ Этап 1: Формулировка проблемы", expanded=False):
             st.subheader("Сформулированная проблема")
             st.write(st.session_state.problem_formulation)
@@ -339,17 +622,14 @@ def generate_response():
             st.subheader("Сгенерированные поисковые запросы")
             st.write(queries)
             
-            # Полный вывод LLM (без вложенного expander)
             st.subheader("Полный вывод LLM")
             st.code(problem_result, language='text')
         
-        # Формирование отчета
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
         full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
 
-        # Этап 2: Поиск информации
         status_area.info("🔍 Выполняю поиск информации...")
         all_search_results = ""
         
@@ -370,7 +650,6 @@ def generate_response():
                 search_result_str = "\n\n".join(formatted_results)
                 all_search_results += f"### Результаты по запросу '{search_query}':\n\n{search_result_str}\n\n"
                 
-                # Показ результатов в боковой панели (без вложенных expanders)
                 st.sidebar.subheader(f"🔍 Результаты по запросу: '{search_query}'")
                 for j, r in enumerate(search_result_list, 1):
                     title = r.get('title', 'Без названия')
@@ -393,7 +672,6 @@ def generate_response():
         
         st.session_state.search_results = all_search_results
         
-        # Этап 3: Применение когнитивных методик
         status_area.info("⚙️ Применяю когнитивные методики...")
         
         all_methods = CORE_METHODS.copy()
@@ -411,7 +689,6 @@ def generate_response():
                 result = apply_cognitive_method(method)
                 st.session_state.method_results[method] = result
                 
-                # Отображаем результат метода без вложенного expander
                 st.subheader(f"✅ {method}")
                 st.text_area("", value=result, height=300, label_visibility="collapsed")
                 
@@ -422,7 +699,6 @@ def generate_response():
             
             time.sleep(1)
         
-        # Этап 4: Уточняющий поиск
         status_area.info("🔍 Выполняю уточняющий поиск...")
         refinement_search_results = ""
     
@@ -453,7 +729,6 @@ def generate_response():
                 except Exception as e:
                     refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
     
-        # Этап 5: Итоговые выводы
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
         try:
@@ -467,7 +742,6 @@ def generate_response():
             st.error(f"Ошибка при генерации выводов: {str(e)}")
             full_report += f"### Ошибка при генерации выводов: {str(e)}\n\n"
         
-        # Сохраняем полный отчет (без результатов поиска)
         st.session_state.report_content = full_report
         progress_bar.progress(100)
         status_area.success("✅ Обработка завершена!")
@@ -509,13 +783,13 @@ with col2:
     )
 
 uploaded_file = st.file_uploader(
-    "Загрузите DOCX файл с подобранным вручную дополнительным контекстом (все что имеет значение, не более 300 тыс. символов):",
-    type=["docx"],
+    "Загрузите файл с дополнительным контекстом (DOCX, XLSX, PPTX, PDF):",
+    type=["docx", "xlsx", "pptx", "pdf"],
     key="uploaded_file"
 )
 
 if uploaded_file:
-    parse_docx(uploaded_file)
+    parse_uploaded_file(uploaded_file)
 
 if st.button("Сгенерировать решение", disabled=st.session_state.processing):
     generate_response()
@@ -524,19 +798,16 @@ if st.session_state.report_content and not st.session_state.processing:
     st.divider()
     st.subheader("Экспорт результатов")
     
-    # Текстовый экспорт
     b64_txt = base64.b64encode(st.session_state.report_content.encode()).decode()
     txt_href = f'<a href="data:file/txt;base64,{b64_txt}" download="report.txt">📥 Скачать TXT Markdown отчет</a>'
     st.markdown(txt_href, unsafe_allow_html=True)
     
-    # HTML экспорт
     try:
         html_bytes = create_html_report(st.session_state.report_content, "Отчет Troubleshooter")
         b64_html = base64.b64encode(html_bytes).decode()
         html_href = f'<a href="data:text/html;base64,{b64_html}" download="report.html">📥 Скачать HTML отчет</a>'
         st.markdown(html_href, unsafe_allow_html=True)
         
-        # Превью отчета
         with st.expander("Предпросмотр отчета"):
             st.components.v1.html(html_bytes.decode('utf-8'), height=600, scrolling=True)
             
