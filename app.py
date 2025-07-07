@@ -485,21 +485,10 @@ with col2:
         key="temperature"
     )
 
-# Основной загрузчик файлов
-uploaded_file = st.file_uploader(
-    "Загрузите файл с дополнительным контекстом (DOCX, XLSX, PPTX, PDF):",
-    type=["docx", "xlsx", "pptx", "pdf"],
-    key="uploaded_file"
-)
 
-if uploaded_file:
-    markdown_content = convert_uploaded_file_to_markdown(uploaded_file)
-    if markdown_content is not None:
-        st.session_state.current_doc_text = markdown_content
-        st.success(f"📂 Document converted: {len(st.session_state.current_doc_text)} characters")
-    else:
-        st.error("🚨 Unsupported file type or conversion error")
-        st.session_state.current_doc_text = ""
+
+
+#########
 
 # Новый загрузчик для временных рядов
 st.markdown("---")
