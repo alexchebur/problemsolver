@@ -555,30 +555,32 @@ time_series_file = st.file_uploader(
 
 if st.button("Анализировать числовые данные", key="analyze_ts_button"):
     if time_series_file is not None:
-        markdown_data = convert_uploaded_file_to_markdown(time_series_file)
-        if markdown_data:
-            # Сохраняем сырые данные для возможного отображения
-            st.session_state.time_series_raw = markdown_data
-            
-            # Запускаем анализ
-            with st.spinner("🔢 Анализирую временные ряды..."):
-                analysis_result = analyze_time_series(markdown_data)
-                st.session_state.time_series_analysis = analysis_result
-            
-            st.success("✅ Анализ временных рядов завершен!")
-            
-            # Показываем результаты анализа
-            st.subheader("Результат анализа временных рядов")
-            st.write(analysis_result)
-            
-            # Показываем сырые данные по запросу
-            if st.checkbox("Показать исходные данные"):
-                st.subheader("Исходные данные временных рядов")
-                st.markdown(markdown_data)
-        else:
-            st.error("Ошибка конвертации файла.")
+        # Сохраняем сырые данные для возможного отображения
+        st.session_state.time_series_raw = time_series_file.getvalue()
+        
+        # Запускаем анализ
+        with st.spinner("🔢 Анализирую временные ряды..."):
+            analysis_result = analyze_time_series(st.session_state.time_series_raw)
+            st.session_state.time_series_analysis = analysis_result
+        
+        st.success("✅ Анализ временных рядов завершен!")
+        
+        # Показываем результаты анализа
+        st.subheader("Результат анализа временных рядов")
+        st.write(analysis_result)
     else:
         st.warning("Пожалуйста, загрузите файл XLSX.")
+
+# Показываем сырые данные по запросу
+if st.session_state.get('time_series_raw') and st.checkbox("Показать исходные данные временных рядов"):
+    st.subheader("Исходные данные временных рядов")
+    
+    try:
+        # Используем новую функцию конвертации для отображения
+        markdown_data = convert_excel_to_markdown_for_analysis(st.session_state.time_series_raw)
+        st.markdown(markdown_data)
+    except Exception as e:
+        st.error(f"Ошибка при отображении данных: {str(e)}")
 
 if st.button("Сгенерировать решение", disabled=st.session_state.processing):
     generate_response()
