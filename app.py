@@ -1,3 +1,5 @@
+
+
 import streamlit as st
 import google.generativeai as genai
 import time
@@ -15,7 +17,12 @@ from websearch import WebSearcher
 from typing import List, Tuple
 import re
 from report import create_html_report
-#from mermaid import add_mermaid_diagrams_to_pdf 
+from prompts import (
+    PROMPT_FORMULATE_PROBLEM_AND_QUERIES,
+    PROMPT_APPLY_COGNITIVE_METHOD,
+    PROMPT_GENERATE_REFINEMENT_QUERIES,
+    PROMPT_GENERATE_FINAL_CONCLUSIONS
+)
 
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
@@ -47,6 +54,8 @@ if 'generated_queries' not in st.session_state:
     st.session_state.generated_queries = []
 if 'search_results' not in st.session_state:
     st.session_state.search_results = ""
+if 'internal_dialog' not in st.session_state:
+    st.session_state.internal_dialog = ""
 
 # Модель
 #model = genai.GenerativeModel('gemini-2.0-flash')
@@ -80,6 +89,34 @@ ADDITIONAL_METHODS = [
     "Теории Решения Изобретательских задач"
 ]
 
+# Конфигурация контекста для разных этапов
+CONTEXT_CONFIG = {
+    'problem_formulation': {
+        'doc_text': True,
+        'original_query': True,
+        'search_results': False,
+        'method_results': False
+    },
+    'cognitive_method': {
+        'doc_text': True,
+        'original_query': True,
+        'search_results': True,
+        'method_results': False
+    },
+    'refinement_queries': {
+        'doc_text': False,
+        'original_query': True,
+        'search_results': True,
+        'method_results': True
+    },
+    'final_conclusions': {
+        'doc_text': False,
+        'original_query': True,
+        'search_results': True,
+        'method_results': True
+    }
+}
+
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
 
@@ -98,59 +135,36 @@ def parse_docx(uploaded_file):
         st.session_state.current_doc_text = ""
         return False
 
+def build_context(context_type: str) -> str:
+    """Собирает контекст для указанного типа запроса"""
+    config = CONTEXT_CONFIG[context_type]
+    context_parts = []
+    
+    if config['doc_text'] and st.session_state.current_doc_text:
+        context_parts.append(f"Документ: {st.session_state.current_doc_text[:100000]}")
+    
+    if config['original_query'] and 'input_query' in st.session_state:
+        context_parts.append(f"Исходный запрос: {st.session_state.input_query}")
+    
+    if config['search_results'] and st.session_state.search_results:
+        context_parts.append(f"Результаты поиска: {st.session_state.search_results[:20000]}")
+    
+    if config['method_results'] and hasattr(st.session_state, 'method_results'):
+        method_results = "\n\n".join(
+            [f"{method}:\n{result}" for method, result in st.session_state.method_results.items()]
+        )
+        context_parts.append(f"Анализ методик: {method_results[:10000]}")
+    
+    return "\n\n".join(context_parts)
+
 def formulate_problem_and_queries():
     """Этап 1: Формулирование проблемы и генерация поисковых запросов"""
-    query = st.session_state.input_query.strip()
-    doc_text = st.session_state.current_doc_text[:300000]
+    context = build_context('problem_formulation')
     
-    prompt = f"""
-    Вы - эксперт по решению проблем. Проанализируйте запрос пользователя и документ (если есть):
-
-    Запрос: {query}
-    Документ: {doc_text if doc_text else "Нет документа"}
-
-    Ваши задачи:
-    1. Сформулируйте ключевую проблему
-    2. Проведите рассуждения (внутренний диалог из вытекающих друг из друга 10 шагов каждый вида: вопрос-ответ-сомнения-возражения-вывод) СТРОГО в формате каждого шага:
-       [вопрос на уточнение проблемы]
-       [ответ на вопрос]
-       [аргументы ответа на вопрос]
-       [сомнения в правильности ответа]
-       [аргументы в пользу сомнений в правильности ответа]
-       [возражение на сомнения]
-       [аргументы в обоснование возражений на сомнения]
-       [взвешенный вывод]
-       ...
-    3. Создайте список из 2 поисковых запросов
-    4. Примените First Principles Thinking и System 2 Thinking
-    5. Избегайте запрещенного контента
-
-    Требования к формату:
-    - Начните вывод строго с "ПРОБЛЕМА:"
-    - Затем строго "РАССУЖДЕНИЯ:" с диалогом
-    - Завершите строго "ЗАПРОСЫ:"
-    - Каждый запрос должен начинаться с цифры и точки (1. ...)
-    - Никаких дополнительных пояснений после заголовков
-    - Пример:
-    ПРОБЛЕМА: [формулировка проблемы]
-    РАССУЖДЕНИЯ:
-    [Вопрос 1]
-    [Ответ 1]
-    [Аргументы ответа 1 на вопрос 1]
-    [Сомнение 1]
-    [Аргументы в пользу сомнения 1 в правильности ответа 1]
-    [Возражение на сомнение 1]
-    [Аргументы в обоснование возражений на сомнение 1]
-    [Взвешенный вывод 1]
-
-    [Вопрос 2] - ДОЛЖЕН быть адресован к выводу из предыдущего шага [Взвешенный вывод 1]
-    [Ответ 2]
-    ...
-    ЗАПРОСЫ:
-    1. [Запрос 1]
-    2. [Запрос 2]
-    ...
-    """
+    prompt = PROMPT_FORMULATE_PROBLEM_AND_QUERIES.format(
+        query=st.session_state.input_query.strip(),
+        doc_text=st.session_state.current_doc_text[:300000] if st.session_state.current_doc_text else "Нет документа"
+    )
     
     try:
         response = model.generate_content(
@@ -202,47 +216,15 @@ def formulate_problem_and_queries():
         st.error(f"Ошибка при формулировании проблемы: {str(e)}")
         return f"Ошибка: {str(e)}", []
 
-def apply_cognitive_method(method_name, context):
+def apply_cognitive_method(method_name: str):
     """Применяет когнитивную методику к проблеме"""
-    prompt = f"""
-    Примените методику {method_name} к проблеме:
+    context = build_context('cognitive_method')
     
-    {st.session_state.problem_formulation}
-    
-    Контекст:
-    {context}
-    
-    Требования:
-    - Детально опишите процесс применения методики
-    - Сформулируйте выводы и решения
-    - Ответ должен быть не менее 9000 символов
-    - Используйте строгий анализ, избегайте общих фраз
-    - Для процессов и потоков пишите код визуализаций в формате Mermaid
-    - Требования к коду диаграмм Mermaid: 
-    
-    1. Всегда начинайте с `graph TD` или `graph LR`
-    2. Используйте простые идентификаторы: A, B, C
-    3. Максимум 8 узлов на диаграмму
-    4. Текст в узлах должен быть кратким (3-5 слов)
-    5. Используйте только базовые формы: 
-        - Прямоугольник: A["Текст"]
-        - Круг: B(("Текст"))
-        - Ромб: C{{"Текст"}}
-    6. Всегда завершайте команды точкой с запятой
-    7. Пример корректной диаграммы:
-    ```mermaid
-    graph TD
-        A["Начало"] --> B{{"Решение?"}};
-        B -->|Да| C["Путь 1"];
-        B -->|Нет| D["Путь 2"];
-    Строго запрещено:
-    Длинные тексты (более 100 символов)
-    Незавершенные узлы или диаграммы
-    Незакрытые фигурные или квадратные скобки
-    Пустые узлы
-    Сложные конструкции
-    Символы + - * > # в тексте надписей внутри фигур диаграмм
-    """
+    prompt = PROMPT_APPLY_COGNITIVE_METHOD.format(
+        method_name=method_name,
+        problem_formulation=st.session_state.problem_formulation,
+        context=context
+    )
     
     try:
         response = model.generate_content(
@@ -257,24 +239,13 @@ def apply_cognitive_method(method_name, context):
     except Exception as e:
         return f"Ошибка при применении {method_name}: {str(e)}"
 
-def generate_refinement_queries(context: str) -> List[str]:
+def generate_refinement_queries() -> List[str]:
     """Генерирует уточняющие поисковые запросы на основе контекста"""
-    prompt = f"""
-    На основе проведенного анализа сформулируйте 5 уточняющих поисковых запросов, 
-    которые помогут проверить гипотезы и углубить понимание решения:
+    context = build_context('refinement_queries')
     
-    {context[:100000]}
-    
-    Требования:
-    - Запросы должны быть конкретными и направленными на проверку гипотез и углубленное понимание проблемы
-    - Выведите только нумерованный список
-    - Формат:
-        1. [Запрос 1]
-        2. [Запрос 2]
-        3. [Запрос 3]
-        4. [Запрос 4]
-        5. [Запрос 5]
-    """
+    prompt = PROMPT_GENERATE_REFINEMENT_QUERIES.format(
+        context=context[:100000]  # Ограничиваем длину контекста
+    )
     
     try:
         response = model.generate_content(
@@ -299,23 +270,14 @@ def generate_refinement_queries(context: str) -> List[str]:
         st.error(f"Ошибка при генерации уточняющих запросов: {str(e)}")
         return []
 
-def generate_final_conclusions(problem_formulation: str, analysis_context: str) -> str:
+def generate_final_conclusions() -> str:
     """Генерирует итоговые выводы на основе проблемы и контекста анализа"""
-    prompt = f"""
-    На основе анализа сформулируйте итоговые выводы по проблеме:
+    context = build_context('final_conclusions')
     
-    {problem_formulation}
-    
-    Контекст анализа:
-    {analysis_context[:100000]}  # Ограничиваем длину контекста
-    
-    Требования:
-    - Выделите оптимальные решения и максимально детализированно их опишите (подробное описание решения, необходимые ресурсы, план, планируемый результат)
-    - Ответ должен быть структурированным и содержательным
-    - Не включайте технические детали поисковых запросов
-    - Ваша задача - решить проблему пользователя, а не просто описать абстрактные пути
-    - Выводы должны соответствовать предполагаемому результату выполнения запроса пользователя
-    """
+    prompt = PROMPT_GENERATE_FINAL_CONCLUSIONS.format(
+        problem_formulation=st.session_state.problem_formulation,
+        analysis_context=context[:100000]  # Ограничиваем длину контекста
+    )
     
     try:
         response = model.generate_content(
@@ -358,7 +320,7 @@ def generate_response():
             st.warning("⚠️ Использован исходный запрос для поиска (LLM не сгенерировал запросы)")
         
         # Вывод рассуждений в боковую панель
-        if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
+        if st.session_state.internal_dialog:
             st.sidebar.subheader("🧠 Рассуждения ИИ")
             st.sidebar.text_area(
                 "",
@@ -384,8 +346,7 @@ def generate_response():
         # Формирование отчета
         full_report = f"### Этап 1: Формулировка проблемы ###\n\n{problem_result}\n\n"
         full_report += f"Сформулированная проблема: {st.session_state.problem_formulation}\n\n"
-        if hasattr(st.session_state, 'internal_dialog') and st.session_state.internal_dialog:
-            full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
+        full_report += f"Рассуждения:\n{st.session_state.internal_dialog}\n\n"
         full_report += f"Поисковые запросы:\n" + "\n".join([f"{i+1}. {q}" for i, q in enumerate(queries)]) + "\n\n"
 
         # Этап 2: Поиск информации
@@ -432,14 +393,6 @@ def generate_response():
         
         st.session_state.search_results = all_search_results
         
-        # Контекст для следующих этапов
-        context = (
-            f"Проблема: {st.session_state.problem_formulation}\n"
-            f"Исходный запрос: {query}\n"
-            f"Документ: {st.session_state.current_doc_text[:100000]}\n"
-            f"Результаты поиска: {all_search_results[:20000]}"
-        )
-        
         # Этап 3: Применение когнитивных методик
         status_area.info("⚙️ Применяю когнитивные методики...")
         
@@ -447,7 +400,7 @@ def generate_response():
         if st.session_state.selected_methods:
             all_methods += [m for m in st.session_state.selected_methods if m not in CORE_METHODS]
         
-        method_results = {}
+        st.session_state.method_results = {}
         
         for i, method in enumerate(all_methods):
             progress = int((i + 1) / (len(all_methods) + 1) * 100)
@@ -455,8 +408,8 @@ def generate_response():
             
             status_area.info(f"⚙️ Применяю {method}...")
             try:
-                result = apply_cognitive_method(method, context)
-                method_results[method] = result
+                result = apply_cognitive_method(method)
+                st.session_state.method_results[method] = result
                 
                 # Отображаем результат метода без вложенного expander
                 st.subheader(f"✅ {method}")
@@ -473,12 +426,7 @@ def generate_response():
         status_area.info("🔍 Выполняю уточняющий поиск...")
         refinement_search_results = ""
     
-        refinement_context = (
-            f"Проблема: {st.session_state.problem_formulation}\n"
-            f"Анализ методик: {' '.join(method_results.values())[:10000]}\n"
-        )
-    
-        refinement_queries = generate_refinement_queries(refinement_context)
+        refinement_queries = generate_refinement_queries()
     
         if refinement_queries:
             st.sidebar.subheader("🔎 Уточняющие запросы")
@@ -505,25 +453,11 @@ def generate_response():
                 except Exception as e:
                     refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
     
-        # Обновляем контекст для финальных выводов
-        final_context = f"{context}\n\nРезультаты уточняющего поиска:\n{refinement_search_results}"
-    
         # Этап 5: Итоговые выводы
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
         try:
-            # Формируем контекст только из анализа методик
-            analysis_context = (
-                f"Проблема: {st.session_state.problem_formulation}\n"
-                f"Анализ методик:\n"
-                + "\n\n".join([f"{method}:\n{result}" for method, result in method_results.items()]) +
-                f"\n\nРезультаты уточняющего поиска:\n{refinement_search_results}"
-            )
-            
-            conclusions = generate_final_conclusions(
-                problem_formulation=st.session_state.problem_formulation,
-                analysis_context=analysis_context
-            )
+            conclusions = generate_final_conclusions()
             
             st.subheader("📝 Итоговые выводы")
             st.text_area("", value=conclusions, height=400, label_visibility="collapsed")
@@ -538,11 +472,6 @@ def generate_response():
         progress_bar.progress(100)
         status_area.success("✅ Обработка завершена!")
         
-        # Показываем полный отчет (без результатов поиска)
-        #st.divider()
-        #st.subheader("Полный отчет")
-        #st.text(full_report[:30000] + ("..." if len(full_report) > 30000 else ""))
-
     except Exception as e:
         st.error(f"💥 Критическая ошибка: {str(e)}")
         traceback.print_exc()
