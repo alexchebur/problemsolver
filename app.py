@@ -3,7 +3,9 @@ import google.generativeai as genai
 import time
 import requests
 import traceback
-import mathplotlib
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
 import random
 import base64
 import os
