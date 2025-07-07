@@ -593,10 +593,16 @@ if time_series_file is not None:
                 )
             with col2:
                 y_col = st.selectbox(
-                    "Столбец для оси Y (числовые значения):",
-                    [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])],
-                    index=min(1, len(df.columns)-1)
+                    "Столбец для оси Y:",
+                    df.columns,
+                    index=min(1, len(df.columns)-1)  # Безопасный индекс
                 )
+
+                # Затем преобразуйте выбранный столбец в числа
+                try:
+                    df[y_col] = pd.to_numeric(df[y_col])
+                except:
+                    st.warning(f"Столбец {y_col} не может быть преобразован в числа")
             
             # Выбор типа графика
             plot_type = st.radio(
