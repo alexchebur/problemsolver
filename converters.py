@@ -292,7 +292,7 @@ def convert_uploaded_file_to_markdown(uploaded_file, for_analysis: bool = False)
     except Exception as e:
         return None
 
-def convert_excel_to_markdown_for_analysis(file_content: bytes) -> str:
+def convert_excel_to_markdown_for_analysis(file_content: bytes, max_rows: int = 50) -> str:
     """Специальная конвертация Excel файла для анализа временных рядов"""
     try:
         excel_io = io.BytesIO(file_content)
@@ -302,24 +302,43 @@ def convert_excel_to_markdown_for_analysis(file_content: bytes) -> str:
         for sheet_name in workbook.sheetnames:
             worksheet = workbook[sheet_name]
             data = []
+            headers = []
             
-            # Собираем только числовые данные
-            for row in worksheet.iter_rows(values_only=True):
-                numeric_row = []
-                for cell in row:
-                    if isinstance(cell, (int, float)):
-                        numeric_row.append(f"{cell:.4f}")
-                    elif cell is not None:
-                        # Пропускаем нечисловые данные
-                        continue
-                if numeric_row:
-                    data.append(numeric_row)
+            # Получаем заголовки из первой строки
+            if worksheet.max_row > 0:
+                for cell in worksheet[1]:
+                    headers.append(str(cell.value) if cell.value else f"Column{cell.column}")
             
-            if data:
-                # Форматируем как временной ряд
+            # Собираем данные (числовые и текстовые)
+            for i, row in enumerate(worksheet.iter_rows(min_row=2, values_only=True), 2):
+                if i > max_rows + 1:  # Ограничиваем количество строк
+                    break
+                
+                row_data = []
+                for j, cell in enumerate(row):
+                    if cell is None:
+                        row_data.append("")
+                    elif isinstance(cell, (int, float)):
+                        # Форматируем числа с 4 знаками после запятой
+                        row_data.append(f"{cell:.4f}")
+                    else:
+                        # Сохраняем текстовые значения
+                        row_data.append(str(cell).strip())
+                data.append(row_data)
+            
+            if headers or data:
                 markdown_content.append(f"## Лист: {sheet_name}")
+                
+                # Форматируем таблицу Markdown
+                table = []
+                if headers:
+                    table.append("| " + " | ".join(headers) + " |")
+                    table.append("| " + " | ".join(["---"] * len(headers)) + " |")
+                
                 for row in data:
-                    markdown_content.append("| " + " | ".join(row) + " |")
+                    table.append("| " + " | ".join(row) + " |")
+                
+                markdown_content.append("\n".join(table))
                 markdown_content.append("")
         
         return "\n".join(markdown_content)[:50000]  # Ограничиваем размер
