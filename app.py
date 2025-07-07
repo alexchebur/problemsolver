@@ -616,7 +616,7 @@ if time_series_file is not None:
             numeric_cols = df_clean.select_dtypes(include=np.number).columns.tolist()
             
             # Диагностическая информация
-            with st.expander("🔧 Диагностика данных"):
+            with st.write("🔧 Диагностика данных"):
                 st.write("Типы данных столбцов:")
                 st.write(df_clean.dtypes)
                 
