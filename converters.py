@@ -341,7 +341,7 @@ def convert_excel_to_markdown_for_analysis(file_content: bytes, max_rows: int = 
                 markdown_content.append("\n".join(table))
                 markdown_content.append("")
         
-        return "\n".join(markdown_content)[:50000]  # Ограничиваем размер
+        return "\n".join(markdown_content)[:200000]  # Ограничиваем размер
     
     except Exception as e:
         return f"Ошибка конвертации: {str(e)}"
