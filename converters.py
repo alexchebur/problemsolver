@@ -85,15 +85,19 @@ class WordToMarkdown:
 class ExcelToMarkdown:
     """Converter for Excel files to Markdown"""
     
-    def convert(self, file_content: bytes) -> str:
+    def convert(self, file_content: bytes, for_analysis: bool = False) -> str:
+        """Convert Excel file content to Markdown"""
         excel_io = io.BytesIO(file_content)
-        workbook = load_workbook(excel_io, data_only=True)
+        workbook = load_workbook(excel_io, data_only=True)  # Используем data_only для получения значений вместо формул
         markdown_content = []
         
         for sheet_name in workbook.sheetnames:
             worksheet = workbook[sheet_name]
-            markdown_content.append(f"# {sheet_name}")
-            markdown_content.append("")
+            
+            # Для анализа временных рядов не включаем названия листов
+            if not for_analysis:
+                markdown_content.append(f"# {sheet_name}")
+                markdown_content.append("")
             
             data = []
             for row in worksheet.iter_rows(values_only=True):
@@ -103,43 +107,23 @@ class ExcelToMarkdown:
                         if cell is None:
                             clean_row.append("")
                         else:
-                            cell_value = str(cell).strip()
+                            # Для числовых значений форматируем с ограниченной точностью
+                            if isinstance(cell, (int, float)):
+                                cell_value = f"{cell:.4f}"  # Ограничиваем до 4 знаков после запятой
+                            else:
+                                cell_value = str(cell).strip()
                             clean_row.append(cell_value)
                     data.append(clean_row)
             
             if data:
                 table_md = self._create_markdown_table(data)
                 markdown_content.append(table_md)
-            else:
+            elif not for_analysis:
                 markdown_content.append("*No data in this worksheet*")
             
             markdown_content.append("")
         
         return "\n".join(markdown_content)
-    
-    def _create_markdown_table(self, data: list) -> str:
-        if not data:
-            return ""
-        
-        max_cols = max(len(row) for row in data)
-        padded_data = []
-        for row in data:
-            padded_row = row + [""] * (max_cols - len(row))
-            padded_data.append(padded_row)
-        
-        markdown_table = []
-        
-        if padded_data:
-            header_row = "| " + " | ".join(padded_data[0]) + " |"
-            markdown_table.append(header_row)
-            separator = "| " + " | ".join(["---"] * max_cols) + " |"
-            markdown_table.append(separator)
-            
-            for row in padded_data[1:]:
-                data_row = "| " + " | ".join(row) + " |"
-                markdown_table.append(data_row)
-        
-        return "\n".join(markdown_table)
 
 class PowerPointToMarkdown:
     """Converter for PowerPoint presentations to Markdown"""
@@ -284,7 +268,7 @@ class ConverterFactory:
         }
         return converters.get(file_type)
 
-def convert_uploaded_file_to_markdown(uploaded_file) -> Optional[str]:
+def convert_uploaded_file_to_markdown(uploaded_file, for_analysis: bool = False) -> Optional[str]:
     """Parse uploaded file and convert to Markdown"""
     try:
         if uploaded_file is None:
@@ -298,6 +282,11 @@ def convert_uploaded_file_to_markdown(uploaded_file) -> Optional[str]:
             return None
 
         file_content = uploaded_file.getvalue()
+        
+        # Для Excel используем специальный флаг
+        if file_extension == 'xlsx' and for_analysis:
+            return converter.convert(file_content, for_analysis=True)[:100000]  # Более строгое ограничение
+        
         return converter.convert(file_content)[:300000]  # Limit to 300k characters
 
     except Exception as e:
