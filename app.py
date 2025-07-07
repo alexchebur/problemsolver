@@ -148,6 +148,45 @@ def build_context(context_type: str) -> str:
     
     return "\n\n".join(context_parts)
 
+# Новая функция для анализа временных рядов
+def analyze_time_series(data_md: str):
+    """Анализирует данные временных рядов и генерирует отчет"""
+    analytic_prompt = f"""
+    **Задача:** Проведи анализ временных рядов по схеме: 
+    1. Дескриптивная статистика и аномалии 
+    2. Корреляции (включая запаздывающие и скрытые) 
+    3. Тренды и точки изменения 
+    4. Прогноз на 3 периода
+    5. Детальные выводы о наиболее вероятных причинах корреляций и трендов с учетом контекста и запроса
+    
+    **Требования к выводу:**
+    - Текстовый отчет на русском
+    - Mermaid-диаграммы с прогнозными значениями (*)
+    
+    **Контекст:**
+    Исходный запрос: {st.session_state.input_query}
+    Сформулированная проблема: {st.session_state.problem_formulation}
+    
+    **Данные:**
+    {data_md}
+    """
+    
+    try:
+        response = model.generate_content(
+            analytic_prompt,
+            generation_config={
+                "temperature": st.session_state.temperature * 0.7,
+                "max_output_tokens": 8000
+            },
+            request_options={'timeout': 180}
+        )
+        return response.text
+    except Exception as e:
+        return f"Ошибка при анализе временных рядов: {str(e)}"
+
+
+
+
 def formulate_problem_and_queries():
     """Этап 1: Формулирование проблемы и генерация поисковых запросов"""
     context = build_context('problem_formulation')
