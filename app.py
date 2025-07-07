@@ -554,49 +554,70 @@ if uploaded_file:
 
 # Новый загрузчик для временных рядов
 st.markdown("---")
-st.subheader("Анализ числовых рядов (опциональное дополнение к рассуждениям)")
+st.subheader("Анализ рядов данных (опциональное дополнение к рассуждениям)")
 time_series_file = st.file_uploader(
-    "Загрузите файл XLSX с числовыми рядами для анализа (не забудьте сформулировать основную проблему в строке запроса выше):",
+    "Загрузите файл XLSX с рядами данных для анализа (не забудьте сформулировать основную проблему в строке запроса выше):",
     type=["xlsx"],
     key="time_series_file"
 )
 
 # Добавляем сюда блок визуализации
 if time_series_file is not None:
-    # Предпросмотр данных
     with st.expander("🔍 Предпросмотр данных (первые 10 строк)", expanded=True):
         try:
-            import pandas as pd
-            import matplotlib.pyplot as plt
-            
             df = pd.read_excel(time_series_file)
             st.dataframe(df.head(10))
             
-            # Визуализация временных рядов
-            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-            if numeric_cols:
-                st.markdown("### 📊 Визуализация данных")
-                selected_col = st.selectbox(
-                    "Выберите столбец для графика:",
-                    numeric_cols,
-                    key="ts_visual_col"
+            # Преобразуем все возможные числовые столбцы
+            for col in df.columns:
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='ignore')
+                except:
+                    pass
+            
+            # Визуализация
+            st.markdown("### 📊 Визуализация данных")
+            
+            # Выбор столбцов для оси X и Y
+            col1, col2 = st.columns(2)
+            with col1:
+                x_col = st.selectbox(
+                    "Столбец для оси X (дата/категория):",
+                    df.columns,
+                    index=min(0, len(df.columns)-1)
                 )
-                
-                fig, ax = plt.subplots(figsize=(10, 4))
-                ax.plot(df[selected_col], marker='o', linestyle='-')
-                ax.set_title(f"Динамика показателя '{selected_col}'")
-                ax.grid(True)
-                st.pyplot(fig)
-                
-                # Гистограмма распределения
-                st.markdown("#### Распределение значений")
-                fig2, ax2 = plt.subplots(figsize=(10, 3))
-                ax2.hist(df[selected_col].dropna(), bins=15, edgecolor='black')
-                ax2.set_title(f"Распределение значений '{selected_col}'")
-                st.pyplot(fig2)
-                
+            with col2:
+                y_col = st.selectbox(
+                    "Столбец для оси Y (числовые значения):",
+                    [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])],
+                    index=min(1, len(df.columns)-1)
+                )
+            
+            # Выбор типа графика
+            plot_type = st.radio(
+                "Тип графика:",
+                ["Линейный", "Столбчатый", "Точечный"],
+                horizontal=True
+            )
+            
+            # Построение графика
+            fig, ax = plt.subplots(figsize=(10, 5))
+            
+            if plot_type == "Линейный":
+                ax.plot(df[x_col], df[y_col], marker='o')
+            elif plot_type == "Столбчатый":
+                ax.bar(df[x_col], df[y_col])
+            else:
+                ax.scatter(df[x_col], df[y_col])
+            
+            ax.set_title(f"{plot_type} график: {y_col} по {x_col}")
+            ax.set_xlabel(x_col)
+            ax.set_ylabel(y_col)
+            plt.xticks(rotation=45)
+            st.pyplot(fig)
+            
         except Exception as e:
-            st.warning(f"⚠️ Ошибка предпросмотра: {str(e)}")
+            st.warning(f"Ошибка визуализации: {str(e)}")
 
 if st.button("Анализировать числовые данные", key="analyze_ts_button"):
     if time_series_file is not None:
@@ -604,20 +625,20 @@ if st.button("Анализировать числовые данные", key="an
         st.session_state.time_series_raw = time_series_file.getvalue()
         
         # Запускаем анализ
-        with st.spinner("🔢 Анализирую временные ряды..."):
+        with st.spinner("🔢 Анализирую ряды данных..."):
             analysis_result = analyze_time_series(st.session_state.time_series_raw)
             st.session_state.time_series_analysis = analysis_result
         
         st.success("✅ Анализ временных рядов завершен!")
         
         # Показываем результаты анализа
-        st.subheader("Результат анализа временных рядов")
+        st.subheader("Результат анализа рядов данных")
         st.write(analysis_result)
     else:
         st.warning("Пожалуйста, загрузите файл XLSX.")
 
 # Показываем сырые данные по запросу
-if st.session_state.get('time_series_raw') and st.checkbox("Показать исходные данные временных рядов"):
+if st.session_state.get('time_series_raw') and st.checkbox("Показать исходные данные рядов данных"):
     st.subheader("Исходные данные временных рядов")
     
     try:
