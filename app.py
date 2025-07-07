@@ -569,66 +569,93 @@ time_series_file = st.file_uploader(
 if time_series_file is not None:
     with st.expander("🔍 Предпросмотр данных (первые 10 строк)", expanded=True):
         try:
-            df = pd.read_excel(time_series_file)
+            import pandas as pd
+            import matplotlib.pyplot as plt
+            
+            # Загружаем данные, конвертируя "None" в NaN
+            df = pd.read_excel(time_series_file, na_values=['None', 'N/A', 'NaN'])
             st.dataframe(df.head(10))
-            st.write("Доступные столбцы:", df.dtypes)
             
-            # Преобразуем все возможные числовые столбцы
-            for col in df.columns:
-                try:
-                    df[col] = pd.to_numeric(df[col], errors='ignore')
-                except:
-                    pass
+            # Автоматически определяем числовые столбцы
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
             
-            # Визуализация
-            st.markdown("### 📊 Визуализация данных")
+            # Если числовых столбцов нет, пытаемся преобразовать все столбцы
+            if not numeric_cols:
+                for col in df.columns:
+                    try:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                    except:
+                        pass
+                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
             
-            # Выбор столбцов для оси X и Y
-            col1, col2 = st.columns(2)
-            with col1:
-                x_col = st.selectbox(
-                    "Столбец для оси X (дата/категория):",
-                    df.columns,
-                    index=min(0, len(df.columns)-1)
-                )
-            with col2:
-                y_col = st.selectbox(
-                    "Столбец для оси Y:",
-                    df.columns,
-                    index=min(1, len(df.columns)-1)  # Безопасный индекс
-                )
-
-                # Затем преобразуйте выбранный столбец в числа
-                try:
-                    df[y_col] = pd.to_numeric(df[y_col])
-                except:
-                    st.warning(f"Столбец {y_col} не может быть преобразован в числа")
-            
-            # Выбор типа графика
-            plot_type = st.radio(
-                "Тип графика:",
-                ["Линейный", "Столбчатый", "Точечный"],
-                horizontal=True
-            )
-            
-            # Построение графика
-            fig, ax = plt.subplots(figsize=(10, 5))
-            
-            if plot_type == "Линейный":
-                ax.plot(df[x_col], df[y_col], marker='o')
-            elif plot_type == "Столбчатый":
-                ax.bar(df[x_col], df[y_col])
+            # Визуализация данных
+            if numeric_cols:
+                st.markdown("### 📊 Визуализация данных")
+                
+                # Выбор столбцов для визуализации
+                col1, col2 = st.columns(2)
+                with col1:
+                    x_col = st.selectbox(
+                        "Столбец для оси X:",
+                        df.columns,
+                        index=0
+                    )
+                with col2:
+                    y_col = st.selectbox(
+                        "Столбец для оси Y (числовые значения):",
+                        numeric_cols,
+                        index=0 if numeric_cols else None
+                    )
+                
+                # Удаляем строки с NaN в выбранных столбцах
+                plot_df = df[[x_col, y_col]].dropna()
+                
+                if not plot_df.empty:
+                    # Выбор типа графика
+                    plot_type = st.radio(
+                        "Тип графика:",
+                        ["Линейный", "Столбчатый", "Точечный"],
+                        horizontal=True
+                    )
+                    
+                    # Построение графика
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    
+                    if plot_type == "Линейный":
+                        ax.plot(plot_df[x_col], plot_df[y_col], marker='o', linestyle='-')
+                    elif plot_type == "Столбчатый":
+                        ax.bar(plot_df[x_col], plot_df[y_col])
+                    else:
+                        ax.scatter(plot_df[x_col], plot_df[y_col])
+                    
+                    ax.set_title(f"{plot_type} график: {y_col} по {x_col}")
+                    ax.set_xlabel(x_col)
+                    ax.set_ylabel(y_col)
+                    ax.grid(True)
+                    
+                    # Автоматический поворот меток для длинных текстов
+                    if any(len(str(label)) > 5 for label in plot_df[x_col]):
+                        plt.xticks(rotation=45, ha='right')
+                    
+                    st.pyplot(fig)
+                    
+                    # Гистограмма распределения
+                    st.markdown("#### Распределение значений")
+                    fig2, ax2 = plt.subplots(figsize=(10, 3))
+                    ax2.hist(plot_df[y_col].dropna(), bins=15, edgecolor='black')
+                    ax2.set_title(f"Распределение значений '{y_col}'")
+                    ax2.grid(True)
+                    st.pyplot(fig2)
+                else:
+                    st.warning("Нет данных для построения графика после удаления пустых значений")
             else:
-                ax.scatter(df[x_col], df[y_col])
-            
-            ax.set_title(f"{plot_type} график: {y_col} по {x_col}")
-            ax.set_xlabel(x_col)
-            ax.set_ylabel(y_col)
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
+                st.warning("В данных не найдены числовые столбцы для визуализации")
             
         except Exception as e:
             st.warning(f"Ошибка визуализации: {str(e)}")
+            # Для отладки можно вывести подробную информацию
+            st.error(f"Типы столбцов: {df.dtypes}")
+            st.error(f"Числовые столбцы: {numeric_cols}")
 
 if st.button("Анализировать числовые данные", key="analyze_ts_button"):
     if time_series_file is not None:
