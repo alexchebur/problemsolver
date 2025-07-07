@@ -1,7 +1,6 @@
    streamlit==1.44.1
    google-generativeai
    python-docx
-   fpdf2
    markdown2
    fake-useragent
    beautifulsoup4==4.12.3
@@ -14,5 +13,9 @@
    pygments
    markdown
    duckduckpy
+   openpyxl
+   PyPDF2
+   python-pptx
+   pandas
    
 
