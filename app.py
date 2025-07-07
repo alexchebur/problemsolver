@@ -571,22 +571,61 @@ if time_series_file is not None:
         try:
             import pandas as pd
             import matplotlib.pyplot as plt
+            import numpy as np
             
-            # Загружаем данные, конвертируя "None" в NaN
-            df = pd.read_excel(time_series_file, na_values=['None', 'N/A', 'NaN'])
+            # Загрузка данных с пропуском первых строк
+            skip_rows = st.number_input("Пропустить первых строк:", min_value=0, value=0, step=1, key="skip_rows")
+            
+            # Загрузка данных
+            df = pd.read_excel(
+                time_series_file, 
+                skiprows=skip_rows,
+                na_values=['None', 'N/A', 'NaN', 'NA', ''],
+                keep_default_na=False
+            )
+            
+            # Удаление полностью пустых столбцов
+            df = df.dropna(axis=1, how='all')
+            
             st.dataframe(df.head(10))
             
-            # Автоматически определяем числовые столбцы
-            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            # Создаем копию DataFrame для преобразования
+            df_clean = df.copy()
             
-            # Если числовых столбцов нет, пытаемся преобразовать все столбцы
-            if not numeric_cols:
-                for col in df.columns:
-                    try:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                    except:
-                        pass
-                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            # Функция для преобразования в числа
+            def safe_convert_to_numeric(series):
+                try:
+                    # Сначала попробуем преобразовать в float
+                    converted = pd.to_numeric(series, errors='coerce')
+                    
+                    # Если получилось, вернем преобразованный ряд
+                    if not converted.isna().all():
+                        return converted
+                    
+                    # Если не получилось, попробуем извлечь числа из строк
+                    numeric_values = series.astype(str).str.extract(r'([-+]?\d*\.\d+|\d+)', expand=False)
+                    return pd.to_numeric(numeric_values, errors='coerce')
+                except:
+                    return series
+            
+            # Преобразуем все столбцы в числа, где это возможно
+            for col in df_clean.columns:
+                df_clean[col] = safe_convert_to_numeric(df_clean[col])
+            
+            # Определяем числовые столбцы
+            numeric_cols = df_clean.select_dtypes(include=np.number).columns.tolist()
+            
+            # Диагностическая информация
+            with st.expander("🔧 Диагностика данных"):
+                st.write("Типы данных столбцов:")
+                st.write(df_clean.dtypes)
+                
+                if numeric_cols:
+                    st.write("Числовые столбцы:", numeric_cols)
+                    st.write("Статистика числовых столбцов:")
+                    st.write(df_clean[numeric_cols].describe())
+                else:
+                    st.warning("Не найдено числовых столбцов")
             
             # Визуализация данных
             if numeric_cols:
@@ -597,24 +636,38 @@ if time_series_file is not None:
                 with col1:
                     x_col = st.selectbox(
                         "Столбец для оси X:",
-                        df.columns,
+                        df_clean.columns,
                         index=0
                     )
                 with col2:
                     y_col = st.selectbox(
-                        "Столбец для оси Y (числовые значения):",
+                        "Столбец для оси Y:",
                         numeric_cols,
                         index=0 if numeric_cols else None
                     )
                 
                 # Удаляем строки с NaN в выбранных столбцах
-                plot_df = df[[x_col, y_col]].dropna()
+                plot_df = df_clean[[x_col, y_col]].dropna()
                 
                 if not plot_df.empty:
+                    # Автоматически определяем тип оси X
+                    if pd.api.types.is_numeric_dtype(plot_df[x_col]):
+                        x_type = "Числовой"
+                    else:
+                        # Пробуем преобразовать в дату
+                        try:
+                            plot_df[x_col] = pd.to_datetime(plot_df[x_col], errors='coerce')
+                            if not plot_df[x_col].isna().all():
+                                x_type = "Дата/время"
+                            else:
+                                x_type = "Категория"
+                        except:
+                            x_type = "Категория"
+                    
                     # Выбор типа графика
                     plot_type = st.radio(
                         "Тип графика:",
-                        ["Линейный", "Столбчатый", "Точечный"],
+                        ["Линейный", "Столбчатый", "Точечный", "Гистограмма"],
                         horizontal=True
                     )
                     
@@ -624,38 +677,39 @@ if time_series_file is not None:
                     if plot_type == "Линейный":
                         ax.plot(plot_df[x_col], plot_df[y_col], marker='o', linestyle='-')
                     elif plot_type == "Столбчатый":
-                        ax.bar(plot_df[x_col], plot_df[y_col])
-                    else:
+                        if x_type == "Категория":
+                            ax.bar(plot_df[x_col].astype(str), plot_df[y_col])
+                        else:
+                            ax.bar(plot_df[x_col], plot_df[y_col])
+                    elif plot_type == "Точечный":
                         ax.scatter(plot_df[x_col], plot_df[y_col])
+                    else:  # Гистограмма
+                        ax.hist(plot_df[y_col].dropna(), bins=15, edgecolor='black')
+                        ax.set_xlabel(y_col)
+                        ax.set_ylabel("Частота")
                     
-                    ax.set_title(f"{plot_type} график: {y_col} по {x_col}")
-                    ax.set_xlabel(x_col)
-                    ax.set_ylabel(y_col)
-                    ax.grid(True)
+                    if plot_type != "Гистограмма":
+                        ax.set_xlabel(x_col)
+                        ax.set_ylabel(y_col)
+                        ax.set_title(f"{plot_type} график: {y_col} по {x_col}")
                     
-                    # Автоматический поворот меток для длинных текстов
-                    if any(len(str(label)) > 5 for label in plot_df[x_col]):
+                    # Форматирование оси X в зависимости от типа
+                    if x_type == "Дата/время":
+                        fig.autofmt_xdate()  # Автоматический поворот дат
+                    elif x_type == "Категория":
                         plt.xticks(rotation=45, ha='right')
                     
+                    ax.grid(True)
                     st.pyplot(fig)
-                    
-                    # Гистограмма распределения
-                    st.markdown("#### Распределение значений")
-                    fig2, ax2 = plt.subplots(figsize=(10, 3))
-                    ax2.hist(plot_df[y_col].dropna(), bins=15, edgecolor='black')
-                    ax2.set_title(f"Распределение значений '{y_col}'")
-                    ax2.grid(True)
-                    st.pyplot(fig2)
                 else:
                     st.warning("Нет данных для построения графика после удаления пустых значений")
             else:
                 st.warning("В данных не найдены числовые столбцы для визуализации")
             
         except Exception as e:
-            st.warning(f"Ошибка визуализации: {str(e)}")
-            # Для отладки можно вывести подробную информацию
-            st.error(f"Типы столбцов: {df.dtypes}")
-            st.error(f"Числовые столбцы: {numeric_cols}")
+            st.error(f"Ошибка визуализации: {str(e)}")
+            import traceback
+            st.text(traceback.format_exc())
 
 if st.button("Анализировать числовые данные", key="analyze_ts_button"):
     if time_series_file is not None:
