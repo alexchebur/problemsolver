@@ -291,3 +291,38 @@ def convert_uploaded_file_to_markdown(uploaded_file, for_analysis: bool = False)
 
     except Exception as e:
         return None
+
+def convert_excel_to_markdown_for_analysis(file_content: bytes) -> str:
+    """Специальная конвертация Excel файла для анализа временных рядов"""
+    try:
+        excel_io = io.BytesIO(file_content)
+        workbook = load_workbook(excel_io, data_only=True)
+        markdown_content = []
+        
+        for sheet_name in workbook.sheetnames:
+            worksheet = workbook[sheet_name]
+            data = []
+            
+            # Собираем только числовые данные
+            for row in worksheet.iter_rows(values_only=True):
+                numeric_row = []
+                for cell in row:
+                    if isinstance(cell, (int, float)):
+                        numeric_row.append(f"{cell:.4f}")
+                    elif cell is not None:
+                        # Пропускаем нечисловые данные
+                        continue
+                if numeric_row:
+                    data.append(numeric_row)
+            
+            if data:
+                # Форматируем как временной ряд
+                markdown_content.append(f"## Лист: {sheet_name}")
+                for row in data:
+                    markdown_content.append("| " + " | ".join(row) + " |")
+                markdown_content.append("")
+        
+        return "\n".join(markdown_content)[:50000]  # Ограничиваем размер
+    
+    except Exception as e:
+        return f"Ошибка конвертации: {str(e)}"
