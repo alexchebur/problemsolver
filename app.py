@@ -558,6 +558,43 @@ time_series_file = st.file_uploader(
     key="time_series_file"
 )
 
+# Добавляем сюда блок визуализации
+if time_series_file is not None:
+    # Предпросмотр данных
+    with st.expander("🔍 Предпросмотр данных (первые 10 строк)", expanded=True):
+        try:
+            import pandas as pd
+            import matplotlib.pyplot as plt
+            
+            df = pd.read_excel(time_series_file)
+            st.dataframe(df.head(10))
+            
+            # Визуализация временных рядов
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            if numeric_cols:
+                st.markdown("### 📊 Визуализация данных")
+                selected_col = st.selectbox(
+                    "Выберите столбец для графика:",
+                    numeric_cols,
+                    key="ts_visual_col"
+                )
+                
+                fig, ax = plt.subplots(figsize=(10, 4))
+                ax.plot(df[selected_col], marker='o', linestyle='-')
+                ax.set_title(f"Динамика показателя '{selected_col}'")
+                ax.grid(True)
+                st.pyplot(fig)
+                
+                # Гистограмма распределения
+                st.markdown("#### Распределение значений")
+                fig2, ax2 = plt.subplots(figsize=(10, 3))
+                ax2.hist(df[selected_col].dropna(), bins=15, edgecolor='black')
+                ax2.set_title(f"Распределение значений '{selected_col}'")
+                st.pyplot(fig2)
+                
+        except Exception as e:
+            st.warning(f"⚠️ Ошибка предпросмотра: {str(e)}")
+
 if st.button("Анализировать числовые данные", key="analyze_ts_button"):
     if time_series_file is not None:
         # Сохраняем сырые данные для возможного отображения
