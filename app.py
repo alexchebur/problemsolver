@@ -94,7 +94,6 @@ ADDITIONAL_METHODS = [
     "Теории Решения Изобретательских задач"
 ]
 
-# Конфигурация контекста для разных этапов
 CONTEXT_CONFIG = {
     'problem_formulation': {
         'doc_text': True,
@@ -102,7 +101,8 @@ CONTEXT_CONFIG = {
         'search_results': False,
         'method_results': False,
         'time_series': False,
-        'internal_dialog': False  # На первом этапе еще не сгенерирован
+        'internal_dialog': False,
+        'refinement_search': False
     },
     'cognitive_method': {
         'doc_text': True,
@@ -110,7 +110,8 @@ CONTEXT_CONFIG = {
         'search_results': True,
         'method_results': False,
         'time_series': True,
-        'internal_dialog': True  # Добавлено
+        'internal_dialog': True,
+        'refinement_search': False
     },
     'refinement_queries': {
         'doc_text': False,
@@ -118,8 +119,8 @@ CONTEXT_CONFIG = {
         'search_results': True,
         'method_results': True,
         'time_series': True,
-        'internal_dialog': True,  # Добавлено
-        'refinement_search': False  # Пока еще не выполнено
+        'internal_dialog': True,
+        'refinement_search': False
     },
     'final_conclusions': {
         'doc_text': False,
@@ -127,8 +128,8 @@ CONTEXT_CONFIG = {
         'search_results': True,
         'method_results': True,
         'time_series': True,
-        'internal_dialog': True,  # Добавлено
-        'refinement_search': True  # Добавлено
+        'internal_dialog': True,
+        'refinement_search': True
     }
 }
 
