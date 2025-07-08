@@ -25,7 +25,7 @@ from converters import (
     convert_uploaded_file_to_markdown, 
     convert_excel_to_markdown_for_analysis  # Добавьте эту строку
 )
-
+from google.generativeai.types import ThinkingConfig, GenerationConfig
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
 if not api_key:
@@ -324,7 +324,7 @@ def generate_refinement_queries() -> List[str]:
         return []
 
 def generate_final_conclusions() -> str:
-    """Генерирует итоговые выводы на основе проблемы и контекста анализа"""
+    """Генерирует итоговые выводы на основе проблемы и контекста анализа с использованием thinking-режима"""
     context = build_context('final_conclusions')
     
     prompt = PROMPT_GENERATE_FINAL_CONCLUSIONS.format(
@@ -333,14 +333,36 @@ def generate_final_conclusions() -> str:
     )
     
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": st.session_state.temperature * 0.7,
-                "max_output_tokens": 9000
-            },
-            request_options={'timeout': 120}
+        # Создаем конфигурацию thinking-режима
+        thinking_config = ThinkingConfig(
+            thinking_budget=-1,  # Динамический режим (модель сама определяет объем thinking)
+            include_thoughts=True  # Не включать сводки мыслей в вывод
         )
+        
+        # Создаем конфигурацию генерации
+        generation_config = GenerationConfig(
+            temperature=st.session_state.temperature * 0.7,
+            max_output_tokens=9000,
+            thinking_config=thinking_config
+        )
+        
+        # Используем низкоуровневый клиент для поддержки thinking-режима
+        client = genai.Client()
+        response = client.generate_content(
+            model='gemini-2.5-flash-lite-preview-06-17',
+            contents=prompt,
+            generation_config=generation_config,
+            request_options={'timeout': 180}
+        )
+        
+        # Для отладки: выводим информацию об использовании thinking-токенов
+        if response.usage_metadata:
+            tokens_info = (
+                f"Thinking tokens: {response.usage_metadata.thoughts_token_count}, "
+                f"Output tokens: {response.usage_metadata.candidates_token_count}"
+            )
+            st.sidebar.info(tokens_info)
+        
         return response.text
     except Exception as e:
         return f"Ошибка при генерации выводов: {str(e)}"
