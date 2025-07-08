@@ -141,33 +141,21 @@ def build_context(context_type: str) -> str:
     config = CONTEXT_CONFIG[context_type]
     context_parts = []
     
-    if config['doc_text'] and st.session_state.current_doc_text:
-        context_parts.append(f"Документ: {st.session_state.current_doc_text[:100000]}")
+    components = [
+        ('doc_text', f"Документ: {st.session_state.current_doc_text[:100000]}"),
+        ('original_query', f"Исходный запрос: {st.session_state.input_query}"),
+        ('search_results', f"Первичные результаты поиска: {st.session_state.search_results[:20000]}"),
+        ('method_results', f"Анализ методик: {'\n\n'.join(f'{m}:\n{r}' for m, r in st.session_state.method_results.items())[:10000]}"),
+        ('time_series', f"Анализ временных рядов: {st.session_state.time_series_analysis}"),
+        ('internal_dialog', f"Рассуждения ИИ:\n{st.session_state.internal_dialog[:5000]}"),
+        ('refinement_search', f"Уточняющие результаты поиска:\n{st.session_state.refinement_search_results[:15000]}")
+    ]
     
-    if config['original_query'] and 'input_query' in st.session_state:
-        context_parts.append(f"Исходный запрос: {st.session_state.input_query}")
+    for key, text in components:
+        if config.get(key, False) and st.session_state.get(key.split('_')[0] if '_' in key else key, None):
+            context_parts.append(text)
     
-    if config['search_results'] and st.session_state.search_results:
-        context_parts.append(f"Первичные результаты поиска: {st.session_state.search_results[:20000]}")
-    
-    if config['method_results'] and hasattr(st.session_state, 'method_results'):
-        method_results = "\n\n".join(
-            [f"{method}:\n{result}" for method, result in st.session_state.method_results.items()]
-        )
-        context_parts.append(f"Анализ методик: {method_results[:10000]}")
-    
-    if config['time_series'] and st.session_state.time_series_analysis:
-        context_parts.append(f"Анализ временных рядов: {st.session_state.time_series_analysis}")
-    
-    # Добавляем рассуждения в контекст
-    if config['internal_dialog'] and st.session_state.internal_dialog:
-        context_parts.append(f"Рассуждения ИИ:\n{st.session_state.internal_dialog[:5000]}")
-    
-    # Добавляем результаты уточняющего поиска
-    if config['refinement_search'] and hasattr(st.session_state, 'refinement_search_results'):
-        context_parts.append(f"Уточняющие результаты поиска:\n{st.session_state.refinement_search_results[:15000]}")
-    
-    return "\n\n".join(context_parts)
+    return "\n\n".join(filter(None, context_parts))
 
 # Новая функция для анализа временных рядов
 def analyze_time_series(file_content: bytes) -> str:
@@ -328,35 +316,30 @@ def generate_refinement_queries() -> List[str]:
 # Обновляем функцию generate_final_conclusions()
 def generate_final_conclusions() -> str:
     context = build_context('final_conclusions')
-    
     prompt = PROMPT_GENERATE_FINAL_CONCLUSIONS.format(
         problem_formulation=st.session_state.problem_formulation,
         analysis_context=context[:100000]
     )
     
     try:
-        # Создаем конфигурацию как словарь
-        thinking_config = {
-            "thinking_budget": -1,
-            "include_thoughts": False
-        }
-        
-        # Используем стандартный метод с дополнительными параметрами
+        # Безопасная реализация thinking-режима
         response = model.generate_content(
-            prompt,
+            contents=[prompt],
             generation_config={
                 "temperature": st.session_state.temperature * 0.7,
                 "max_output_tokens": 9000
             },
             request_options={
                 "timeout": 180,
-                "thinking_config": thinking_config
+                "thinking_config": {
+                    "thinking_budget": -1,  # Динамический режим
+                    "include_thoughts": False
+                }
             }
         )
-        
         return response.text
     except Exception as e:
-        return f"Ошибка при генерации выводов: {str(e)}"
+        return f"Ошибка при генерации выводов: {str(e)}\n\n{traceback.format_exc()}"
         
 def generate_response():
     st.session_state.processing = True
@@ -482,30 +465,23 @@ def generate_response():
     
         refinement_queries = generate_refinement_queries()
     
-        if refinement_queries:
-            st.sidebar.subheader("🔎 Уточняющие запросы")
-            for i, query in enumerate(refinement_queries):
-                st.sidebar.write(f"{i+1}. {query}")
-            
-            for i, query in enumerate(refinement_queries):
-                try:
-                    clean_query = query.replace('"', '').strip()
-                    search_results = searcher.perform_search(clean_query, max_results=2, full_text=True)
-                
-                    formatted = []
-                    for j, r in enumerate(search_results, 1):
-                        content = r.get('full_content', r.get('snippet', ''))
-                        formatted.append(
-                            f"Результат {j}: {r.get('title', '')}\n"
-                            f"Контент: {content[:3000]}{'...' if len(content) > 3000 else ''}\n"
-                            f"URL: {r.get('url', '')}\n"
-                        )
-                
-                    st.session_state.refinement_search_results += f"### Уточняющий запрос '{query}':\n\n"
-                    st.session_state.refinement_search_results += "\n\n".join(formatted) + "\n\n"
-                
-                except Exception as e:
-                    st.session_state.refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
+        with st.spinner("🔍 Выполняю уточняющий поиск..."):
+            st.session_state.refinement_search_results = ""
+            refinement_queries = generate_refinement_queries()
+    
+            if refinement_queries:
+                for query in refinement_queries:
+                    try:
+                        results = searcher.perform_search(query.strip('"'), max_results=2, full_text=True)
+                        formatted = [
+                            f"Результат {i+1}: {r.get('title', '')}\n"
+                            f"Контент: {r.get('full_content', r.get('snippet', ''))[:3000]}{'...' if len(r.get('full_content', '')) > 3000 else ''}\n"
+                            f"URL: {r.get('url', '')}"
+                            for i, r in enumerate(results)
+                        ]
+                        st.session_state.refinement_search_results += f"### Уточняющий запрос: {query}\n\n" + "\n\n".join(formatted) + "\n\n"
+                    except Exception as e:
+                        st.session_state.refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
     
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
