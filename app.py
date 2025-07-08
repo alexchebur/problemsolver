@@ -25,7 +25,7 @@ from converters import (
     convert_uploaded_file_to_markdown, 
     convert_excel_to_markdown_for_analysis  # Добавьте эту строку
 )
-from google.generativeai.types import GenerationConfig
+#from google.generativeai.types import GenerationConfig
 from google.generativeai import types
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
