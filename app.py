@@ -100,28 +100,34 @@ CONTEXT_CONFIG = {
         'original_query': True,
         'search_results': False,
         'method_results': False,
-        'time_series': False  # Новое поле
+        'time_series': False,
+        'internal_dialog': False  # На первом этапе еще не сгенерирован
     },
     'cognitive_method': {
         'doc_text': True,
         'original_query': True,
         'search_results': True,
         'method_results': False,
-        'time_series': True   # Новое поле
+        'time_series': True,
+        'internal_dialog': True  # Добавлено
     },
     'refinement_queries': {
         'doc_text': False,
         'original_query': True,
         'search_results': True,
         'method_results': True,
-        'time_series': True   # Новое поле
+        'time_series': True,
+        'internal_dialog': True,  # Добавлено
+        'refinement_search': False  # Пока еще не выполнено
     },
     'final_conclusions': {
         'doc_text': False,
         'original_query': True,
         'search_results': True,
         'method_results': True,
-        'time_series': True   # Новое поле
+        'time_series': True,
+        'internal_dialog': True,  # Добавлено
+        'refinement_search': True  # Добавлено
     }
 }
 
@@ -140,7 +146,7 @@ def build_context(context_type: str) -> str:
         context_parts.append(f"Исходный запрос: {st.session_state.input_query}")
     
     if config['search_results'] and st.session_state.search_results:
-        context_parts.append(f"Результаты поиска: {st.session_state.search_results[:20000]}")
+        context_parts.append(f"Первичные результаты поиска: {st.session_state.search_results[:20000]}")
     
     if config['method_results'] and hasattr(st.session_state, 'method_results'):
         method_results = "\n\n".join(
@@ -148,9 +154,16 @@ def build_context(context_type: str) -> str:
         )
         context_parts.append(f"Анализ методик: {method_results[:10000]}")
     
-    # Добавляем анализ временных рядов в контекст
     if config['time_series'] and st.session_state.time_series_analysis:
         context_parts.append(f"Анализ временных рядов: {st.session_state.time_series_analysis}")
+    
+    # Добавляем рассуждения в контекст
+    if config['internal_dialog'] and st.session_state.internal_dialog:
+        context_parts.append(f"Рассуждения ИИ:\n{st.session_state.internal_dialog[:5000]}")
+    
+    # Добавляем результаты уточняющего поиска
+    if config['refinement_search'] and hasattr(st.session_state, 'refinement_search_results'):
+        context_parts.append(f"Уточняющие результаты поиска:\n{st.session_state.refinement_search_results[:15000]}")
     
     return "\n\n".join(context_parts)
 
@@ -452,7 +465,7 @@ def generate_response():
             time.sleep(1)
         
         status_area.info("🔍 Выполняю уточняющий поиск...")
-        refinement_search_results = ""
+        st.session_state.refinement_search_results = ""
     
         refinement_queries = generate_refinement_queries()
     
@@ -475,11 +488,11 @@ def generate_response():
                             f"URL: {r.get('url', '')}\n"
                         )
                 
-                    refinement_search_results += f"### Уточняющий запрос '{query}':\n\n"
-                    refinement_search_results += "\n\n".join(formatted) + "\n\n"
+                    st.session_state.refinement_search_results += f"### Уточняющий запрос '{query}':\n\n"
+                    st.session_state.refinement_search_results += "\n\n".join(formatted) + "\n\n"
                 
                 except Exception as e:
-                    refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
+                    st.session_state.refinement_search_results += f"### Ошибка поиска для '{query}': {str(e)}\n\n"
     
         status_area.info("📝 Формирую итоговые выводы...")
         progress_bar.progress(95)
