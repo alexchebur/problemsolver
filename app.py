@@ -25,7 +25,8 @@ from converters import (
     convert_uploaded_file_to_markdown, 
     convert_excel_to_markdown_for_analysis  # Добавьте эту строку
 )
-from google.generativeai.types import ThinkingConfig, GenerationConfig
+from google.generativeai.types import GenerationConfig
+from google.generativeai import types
 # Настройка API
 api_key = st.secrets['GEMINI_API_KEY']
 if not api_key:
@@ -323,6 +324,7 @@ def generate_refinement_queries() -> List[str]:
         st.error(f"Ошибка при генерации уточняющих запросов: {str(e)}")
         return []
 
+# Обновляем функцию generate_final_conclusions()
 def generate_final_conclusions() -> str:
     """Генерирует итоговые выводы на основе проблемы и контекста анализа с использованием thinking-режима"""
     context = build_context('final_conclusions')
@@ -334,26 +336,31 @@ def generate_final_conclusions() -> str:
     
     try:
         # Создаем конфигурацию thinking-режима
-        thinking_config = ThinkingConfig(
-            thinking_budget=-1,  # Динамический режим (модель сама определяет объем thinking)
-            include_thoughts=True  # Не включать сводки мыслей в вывод
+        thinking_config = types.ThinkingConfig(
+            thinking_budget=-1,  # Динамический режим
+            include_thoughts=False  # Не включать сводки мыслей в вывод
         )
         
         # Создаем конфигурацию генерации
         generation_config = GenerationConfig(
             temperature=st.session_state.temperature * 0.7,
-            max_output_tokens=9000,
-            thinking_config=thinking_config
+            max_output_tokens=9000
         )
         
         # Используем низкоуровневый клиент для поддержки thinking-режима
-        client = genai.Client()
-        response = client.generate_content(
-            model='gemini-2.5-flash-lite-preview-06-17',
-            contents=prompt,
-            generation_config=generation_config,
-            request_options={'timeout': 180}
+        client = genai.GenerativeModel(
+            model_name='gemini-2.5-flash-lite-preview-06-17',
+            generation_config=generation_config
         )
+        
+        # Создаем конфигурацию запроса
+        request_config = types.GenerateContentRequest(
+            contents=[prompt],
+            thinking_config=thinking_config
+        )
+        
+        # Выполняем запрос
+        response = client.generate_content(request_config)
         
         # Для отладки: выводим информацию об использовании thinking-токенов
         if response.usage_metadata:
@@ -366,7 +373,7 @@ def generate_final_conclusions() -> str:
         return response.text
     except Exception as e:
         return f"Ошибка при генерации выводов: {str(e)}"
-
+        
 def generate_response():
     st.session_state.processing = True
     st.session_state.report_content = None
