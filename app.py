@@ -61,6 +61,8 @@ if 'internal_dialog' not in st.session_state:
 # Добавляем новое состояние для анализа временных рядов
 if 'time_series_analysis' not in st.session_state:
     st.session_state.time_series_analysis = None
+if 'method_results' not in st.session_state:
+    st.session_state.method_results = {}  # Инициализируем пустым словарем
 
 # Модель
 model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-06-17')
