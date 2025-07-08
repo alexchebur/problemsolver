@@ -63,6 +63,8 @@ if 'time_series_analysis' not in st.session_state:
     st.session_state.time_series_analysis = None
 if 'method_results' not in st.session_state:
     st.session_state.method_results = {}  # Инициализируем пустым словарем
+if 'refinement_search_results' not in st.session_state:
+    st.session_state.refinement_search_results = ""  # Новое состояние
 
 # Модель
 model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-06-17')
