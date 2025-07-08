@@ -326,7 +326,6 @@ def generate_refinement_queries() -> List[str]:
 
 # Обновляем функцию generate_final_conclusions()
 def generate_final_conclusions() -> str:
-    """Генерирует итоговые выводы на основе проблемы и контекста анализа с использованием thinking-режима"""
     context = build_context('final_conclusions')
     
     prompt = PROMPT_GENERATE_FINAL_CONCLUSIONS.format(
@@ -335,40 +334,24 @@ def generate_final_conclusions() -> str:
     )
     
     try:
-        # Создаем конфигурацию thinking-режима
-        thinking_config = types.ThinkingConfig(
-            thinking_budget=-1,  # Динамический режим
-            include_thoughts=False  # Не включать сводки мыслей в вывод
+        # Создаем конфигурацию как словарь
+        thinking_config = {
+            "thinking_budget": -1,
+            "include_thoughts": False
+        }
+        
+        # Используем стандартный метод с дополнительными параметрами
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": st.session_state.temperature * 0.7,
+                "max_output_tokens": 9000
+            },
+            request_options={
+                "timeout": 180,
+                "thinking_config": thinking_config
+            }
         )
-        
-        # Создаем конфигурацию генерации
-        generation_config = GenerationConfig(
-            temperature=st.session_state.temperature * 0.7,
-            max_output_tokens=9000
-        )
-        
-        # Используем низкоуровневый клиент для поддержки thinking-режима
-        client = genai.GenerativeModel(
-            model_name='gemini-2.5-flash-lite-preview-06-17',
-            generation_config=generation_config
-        )
-        
-        # Создаем конфигурацию запроса
-        request_config = types.GenerateContentRequest(
-            contents=[prompt],
-            thinking_config=thinking_config
-        )
-        
-        # Выполняем запрос
-        response = client.generate_content(request_config)
-        
-        # Для отладки: выводим информацию об использовании thinking-токенов
-        if response.usage_metadata:
-            tokens_info = (
-                f"Thinking tokens: {response.usage_metadata.thoughts_token_count}, "
-                f"Output tokens: {response.usage_metadata.candidates_token_count}"
-            )
-            st.sidebar.info(tokens_info)
         
         return response.text
     except Exception as e:
