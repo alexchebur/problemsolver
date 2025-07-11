@@ -17,23 +17,25 @@ USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0"
 ]
 
+# web_search.py (обновлённый конструктор и метод)
 class WebSearcher:
-    def __init__(self, delay_range=(1.0, 3.0)):
-        self.delay_range = delay_range
-        self.session = requests.Session()
-        self.session.headers.update({'User-Agent': random.choice(USER_AGENTS)})
+    def __init__(self, google_cse_api_key=None, google_cse_id=None):
+        self.api_key = google_cse_api_key
+        self.cse_id = google_cse_id
         
-        # Настройки Google CSE
-        self.api_key = "AIzaSyCNVeNmUgrt-kL5ZI4EkHFoTjTzRSWATX4"
-        self.cse_id = "a4f17489c6a0a4414"
+        self.search_engines = []
         
-        # Порядок поисковых систем
-        self.search_engines = [
-            self._search_google_cse,
-            self._search_duckduckgo,
-            self._search_google_organic,
-            self._search_bing_ru
-        ]
+        # Добавляем Google CSE только если ключи действительны
+        if self._valid_google_credentials():
+            self.search_engines.append(self._search_google_cse)
+        
+        # Всегда добавляем Яндекс как резервную систему
+        self.search_engines.append(self._search_yandex)
+    
+    def _valid_google_credentials(self) -> bool:
+        """Проверяет, есть ли действительные ключи Google CSE"""
+        return bool(self.api_key and self.cse_id and 
+                   len(self.api_key) > 30 and len(self.cse_id) > 5)
 
     def perform_search(self, queries: Union[str, List[str]], max_results: int = 5, full_text=True) -> List[Dict]:
         """Выполняет поиск по одному или нескольким запросам"""
@@ -172,35 +174,56 @@ class WebSearcher:
             return []
 
     def _search_google_cse(self, query: str, max_results: int) -> List[Dict]:
-        """Поиск через Google Custom Search API"""
+        """Безопасный поиск через Google Custom Search API"""
+        if not self._valid_google_credentials():
+            logger.warning("Google CSE отключен: недействительные учетные данные")
+            return []
+    
         try:
             url = "https://www.googleapis.com/customsearch/v1"
             params = {
                 'key': self.api_key,
                 'cx': self.cse_id,
                 'q': query,
-                'num': max_results,
+                'num': min(max_results, 10),  # Ограничение Google
                 'lr': 'lang_ru',
                 'cr': 'countryRU',
-                'hl': 'ru'
+                'hl': 'ru',
+                'safe': 'high'  # Строгая фильтрация
             }
-            
+        
             response = self.session.get(url, params=params, timeout=15)
             response.raise_for_status()
+        
             data = response.json()
-            
             results = []
+        
             for item in data.get('items', [])[:max_results]:
+                # Проверяем, что это российский юридический ресурс
+                if not self._is_russian_legal_resource(item.get('link', '')):
+                    continue
+                
                 results.append({
                     'title': item.get('title', 'Без названия')[:150],
                     'url': item.get('link', '#'),
                     'snippet': item.get('snippet', 'Без описания')[:500],
                     'query': query
                 })
-            
+        
             return results
+    
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code
+            if status == 403:
+                logger.error("Доступ к Google CSE запрещен. Проверьте API ключ и квоты.")
+            elif status == 429:
+                logger.warning("Превышена квота Google CSE. Используем резервные системы.")
+            else:
+                logger.error(f"Ошибка Google CSE ({status}): {str(e)}")
+            return []
+    
         except Exception as e:
-            logger.error(f"Ошибка Google CSE: {str(e)}")
+            logger.error(f"Неожиданная ошибка Google CSE: {str(e)}")
             return []
 
     def _search_google_organic(self, query: str, max_results: int) -> List[Dict]:
