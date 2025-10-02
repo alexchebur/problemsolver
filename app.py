@@ -11,8 +11,6 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-
-
 # Базовый промпт для создания структуры произведения
 STRUCTURE_PROMPT = """
 Ты - профессиональный писатель и сценарист. На основе предоставленных пользователем данных создай подробную структуру повести.
@@ -100,7 +98,6 @@ CRITIQUE_PROMPT = """
 Для анализа и вынесения вердиктов ты используешь медицинскую, хирургическую или юридическую метафорику (например: "Диагноз: ...", "Протокол вскрытия:", "Вердикт: ..."). 
 Поставь тексту оценку от 10 - отлично до 0 - кошмарно.
 """
-
 
 def generate_structure(genre, setting, alias, temperature):
     """Генерирует структуру повести с заданной температурой"""
@@ -230,7 +227,6 @@ def generate_critique(full_story):
         st.error(f"Ошибка при генерации рецензии: {str(e)}")
         return None
 
-
 def main():
     st.set_page_config(
         page_title="Графоманъ: Генератор повестей",
@@ -241,13 +237,17 @@ def main():
     st.title("📖 Графоманъ: Генератор повестей")
     st.markdown("Создавайте увлекательные повести в заданном жанре и сеттинге")
     
-    # Инициализация session_state для рецензии
+    # Инициализация session_state
     if 'critique' not in st.session_state:
         st.session_state.critique = None
     if 'critique_generated' not in st.session_state:
         st.session_state.critique_generated = False
     if 'full_story' not in st.session_state:
         st.session_state.full_story = ""
+    if 'story_generated' not in st.session_state:
+        st.session_state.story_generated = False
+    if 'generating_critique' not in st.session_state:
+        st.session_state.generating_critique = False
     
     # Секция ввода параметров
     st.header("1. Параметры повести")
@@ -305,7 +305,7 @@ def main():
     alias = st.text_area(
         "Дополнительная идея или концепция:",
         height=100,
-        placeholder="например: история о программисте, попавшем в мир магии, где технологии заменяют запклинания...",
+        placeholder="например: история о программисте, попавшем в мир магии, где технологии заменяют заклинания...",
         help="Любые дополнительные пожелания или идеи для сюжета"
     )
     
@@ -320,10 +320,10 @@ def main():
     ❄️ Низкая температура = больше предсказуемости
     """)
     
-    # Кнопка генерации
+    # Кнопка генерации повести
     st.header("4. Генерация повести")
     
-    if st.button("🎭 Начать создание повести", type="primary"):
+    if st.button("🎭 Начать создание повести", type="primary", key="generate_story"):
         if not genre or not setting:
             st.warning("⚠️ Пожалуйста, заполните жанр и сеттинг")
             return
@@ -400,101 +400,106 @@ def main():
         
         # Сохраняем полную историю в session_state
         st.session_state.full_story = full_story
+        st.session_state.story_generated = True
+        st.success("🎉 Повесть успешно создана!")
+    
+    # Показываем разделы для готовой повести и рецензии только если повесть сгенерирована
+    if st.session_state.story_generated and st.session_state.full_story:
+        # Отображаем полную повесть
+        st.divider()
+        st.header("📘 Готовая повесть")
         
-        # После завершения генерации всех глав:
-        if full_story.strip():
-            # Отображаем полную повесть
-            st.divider()
-            st.header("📘 Готовая повесть")
-            
-            st.text_area("Полный текст повести:", full_story, height=600, key="full_story")
-            
-            # Статистика
-            word_count = len(full_story.split())
-            st.sidebar.header("📊 Статистика")
-            st.sidebar.write(f"Количество глав: {chapters_count}")
-            st.sidebar.write(f"Общий объем: {word_count} слов")
-            st.sidebar.write(f"Уровень фантазии: {creativity}")
-            
-            # Кнопки экспорта
-            st.divider()
-            st.header("💾 Экспорт результата")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Скачивание как TXT
-                b64_txt = base64.b64encode(full_story.encode()).decode()
-                href_txt = f'<a href="data:file/txt;base64,{b64_txt}" download="повесть_{genre}_{creativity}.txt">📥 Скачать как TXT</a>'
-                st.markdown(href_txt, unsafe_allow_html=True)
-            
-            with col2:
-                # Копирование в буфер обмена
-                if st.button("📋 Скопировать в буфер обмена", key="copy_full"):
-                    st.code(full_story, language="markdown")
-                    st.success("Текст скопирован в буфер обмена!")
+        st.text_area("Полный текст повести:", st.session_state.full_story, height=600, key="full_story_display")
+        
+        # Статистика
+        word_count = len(st.session_state.full_story.split())
+        st.sidebar.header("📊 Статистика")
+        st.sidebar.write(f"Общий объем: {word_count} слов")
+        st.sidebar.write(f"Уровень фантазии: {creativity}")
+        
+        # Кнопки экспорта
+        st.divider()
+        st.header("💾 Экспорт результата")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Скачивание как TXT
+            b64_txt = base64.b64encode(st.session_state.full_story.encode()).decode()
+            href_txt = f'<a href="data:file/txt;base64,{b64_txt}" download="повесть_{genre}_{creativity}.txt">📥 Скачать как TXT</a>'
+            st.markdown(href_txt, unsafe_allow_html=True)
+        
+        with col2:
+            # Копирование в буфер обмена
+            if st.button("📋 Скопировать в буфер обмена", key="copy_full"):
+                st.code(st.session_state.full_story, language="markdown")
+                st.success("Текст скопирован в буфер обмена!")
 
-            # Рецензия от критика
-            st.divider()
-            st.header("🎯 Рецензия от Беспощадного Критика")
-            
-            # Показываем информацию о доступности рецензии
-            if not st.session_state.critique_generated:
-                st.info("""
-                **Получите профессиональную рецензию на вашу повесть:**
-                - Строгий анализ сильных и слабых сторон
-                - Конструктивные рекомендации по улучшению
-                - Оценка по 10-балльной шкале
-                - Профессиональная критика с медицинской/юридической метафорикой
-                """)
-            
-            # Кнопка для генерации рецензии
-            critique_col1, critique_col2 = st.columns([3, 1])
-            
-            with critique_col1:
-                if st.button("📝 Получить рецензию от Беспощадного Критика", 
-                            type="secondary",
-                            key="get_critique",
-                            use_container_width=True):
+        # Рецензия от критика
+        st.divider()
+        st.header("🎯 Рецензия от Беспощадного Критика")
+        
+        # Показываем информацию о доступности рецензии
+        if not st.session_state.critique_generated:
+            st.info("""
+            **Получите профессиональную рецензию на вашу повесть:**
+            - Строгий анализ сильных и слабых сторон
+            - Конструктивные рекомендации по улучшению
+            - Оценка по 10-балльной шкале
+            - Профессиональная критика с медицинской/юридической метафорикой
+            """)
+        
+        # Кнопка для генерации рецензии
+        critique_col1, critique_col2 = st.columns([3, 1])
+        
+        with critique_col1:
+            if st.button("📝 Получить рецензию от Беспощадного Критика", 
+                        type="secondary",
+                        key="get_critique",
+                        use_container_width=True,
+                        disabled=st.session_state.generating_critique):
+                
+                st.session_state.generating_critique = True
+                
+                with st.spinner("🔍 Критик анализирует произведение... Это может занять несколько минут"):
+                    critique = generate_critique(st.session_state.full_story)
                     
-                    with st.spinner("🔍 Критик анализирует произведение... Это может занять несколько минут"):
-                        critique = generate_critique(full_story)
-                        
-                        if critique:
-                            st.session_state.critique = critique
-                            st.session_state.critique_generated = True
-                            st.success("✅ Рецензия готова!")
-                            st.rerun()  # Обновляем интерфейс
-                        else:
-                            st.error("❌ Не удалось получить рецензию")
+                    if critique:
+                        st.session_state.critique = critique
+                        st.session_state.critique_generated = True
+                        st.session_state.generating_critique = False
+                        st.success("✅ Рецензия готова!")
+                    else:
+                        st.error("❌ Не удалось получить рецензию")
+                        st.session_state.generating_critique = False
+        
+        with critique_col2:
+            if st.session_state.critique_generated:
+                if st.button("🔄 Обновить рецензию", 
+                           key="refresh_critique",
+                           use_container_width=True):
+                    st.session_state.critique = None
+                    st.session_state.critique_generated = False
+                    st.rerun()
+        
+        # Отображаем рецензию если она есть
+        if st.session_state.critique:
+            st.subheader("Рецензия от Беспощадного Критика")
             
-            with critique_col2:
-                if st.session_state.critique_generated:
-                    if st.button("🔄 Обновить рецензию", 
-                               key="refresh_critique",
-                               use_container_width=True):
-                        st.session_state.critique = None
-                        st.session_state.critique_generated = False
-                        st.rerun()
+            # Красивое отображение рецензии
+            st.text_area("", 
+                       st.session_state.critique, 
+                       height=400, 
+                       key="critique_display")
             
-            # Отображаем рецензию если она есть
-            if st.session_state.critique:
-                st.subheader("Рецензия от Беспощадного Критика")
-                
-                # Красивое отображение рецензии
-                st.text_area("", 
-                           st.session_state.critique, 
-                           height=400, 
-                           key="critique_display")
-                
-                # Кнопка для копирования рецензии
-                copy_col1, copy_col2 = st.columns([3, 1])
-                with copy_col2:
-                    if st.button("📋 Скопировать рецензию", 
-                               key="copy_critique",
-                               use_container_width=True):
-                        st.code(st.session_state.critique, language="markdown")
-                        st.success("Рецензия скопирована в буфер обмена!")
+            # Кнопка для копирования рецензии
+            copy_col1, copy_col2 = st.columns([3, 1])
+            with copy_col2:
+                if st.button("📋 Скопировать рецензию", 
+                           key="copy_critique",
+                           use_container_width=True):
+                    st.code(st.session_state.critique, language="markdown")
+                    st.success("Рецензия скопирована в буфер обмена!")
 
     # Информационная панель
     st.sidebar.header("ℹ️ О приложении")
