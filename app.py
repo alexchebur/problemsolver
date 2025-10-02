@@ -547,9 +547,6 @@ def main():
 
     # ... остальная часть main() ...
 
-if __name__ == "__main__":
-    main()
-    
     # Информационная панель
     st.sidebar.header("ℹ️ О приложении")
     st.sidebar.info("""
