@@ -111,7 +111,7 @@ def generate_chapter(genre, setting, alias, structure, chapter_number, chapter_d
             word_count=word_count
         )
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         response = model.generate_content(prompt)
         
         return response.text
