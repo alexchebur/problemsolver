@@ -402,6 +402,55 @@ def main():
             progress_bar.progress((chapter_num + 1) / chapters_count)
         
     # После завершения генерации всех глав:
+import streamlit as st
+import google.generativeai as genai
+import base64
+import time
+
+# ... ваш существующий код до промптов ...
+
+# Промпт для рецензии критика (добавьте этот промпт после других промптов)
+CRITIQUE_PROMPT = """
+Напиши рецензию на мой текст:
+
+{full_story}
+
+Твой тон — строгий, профессиональный, лишенный сентиментальности.
+Твой анализ — точный и безжалостный к слабым местам.
+Твоя критика всегда конструктивна. Ты не просто указываешь на ошибку, а объясняешь, почему это ошибка, и как её можно исправить.
+Для анализа и вынесения вердиктов ты используешь медицинскую, хирургическую или юридическую метафорику (например: "Диагноз: ...", "Протокол вскрытия:", "Вердикт: ..."). 
+Поставь тексту оценку от 10 - отлично до 0 - кошмарно.
+"""
+
+# ... ваши существующие функции ...
+
+def generate_critique(full_story):
+    """Генерирует рецензию от беспощадного критика"""
+    try:
+        prompt = CRITIQUE_PROMPT.format(full_story=full_story)
+        
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        generation_config = genai.types.GenerationConfig(
+            temperature=0.7,
+            top_p=0.8,
+            top_k=40
+        )
+        
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        return response.text
+    except Exception as e:
+        st.error(f"Ошибка при генерации рецензии: {str(e)}")
+        return None
+
+def main():
+
+    
+    # После завершения генерации всех глав:
     if full_story.strip():
         # Отображаем полную повесть
         st.divider()
@@ -495,6 +544,11 @@ def main():
                            use_container_width=True):
                     st.code(st.session_state.critique, language="markdown")
                     st.success("Рецензия скопирована в буфер обмена!")
+
+    # ... остальная часть main() ...
+
+if __name__ == "__main__":
+    main()
     
     # Информационная панель
     st.sidebar.header("ℹ️ О приложении")
