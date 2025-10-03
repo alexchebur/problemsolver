@@ -430,28 +430,41 @@ def main():
         st.header("🎭 Стиль автора")
         st.info("Выберите стиль известного писателя для вашей повести")
         
+        # Инициализация selected_style если не существует
+        if 'selected_style' not in st.session_state:
+            st.session_state.selected_style = "none"
+        
+        # Создаем колонки для кнопок стилей
         style_col1, style_col2, style_col3, style_col4 = st.columns(4)
         
         with style_col1:
-            if st.button("📚 Без стиля", use_container_width=True):
+            if st.button("📚 Без стиля", use_container_width=True, key="style_none"):
                 st.session_state.selected_style = "none"
+                st.rerun()
         with style_col2:
-            if st.button("⚜️ Толстой", use_container_width=True):
+            if st.button("⚜️ Толстой", use_container_width=True, key="style_tolstoy"):
                 st.session_state.selected_style = "tolstoy"
+                st.rerun()
         with style_col3:
-            if st.button("🌀 Пелевин", use_container_width=True):
+            if st.button("🌀 Пелевин", use_container_width=True, key="style_pelevin"):
                 st.session_state.selected_style = "pelevin"
+                st.rerun()
         with style_col4:
-            if st.button("🦋 Набоков", use_container_width=True):
+            if st.button("🦋 Набоков", use_container_width=True, key="style_nabokov"):
                 st.session_state.selected_style = "nabokov"
+                st.rerun()
+        
+        # Визуальное отображение выбранного стиля
+        st.markdown("---")
         
         # Показываем выбранный стиль
         if st.session_state.selected_style != "none":
             author = AUTHOR_STYLES[st.session_state.selected_style]
             st.success(f"**Выбран стиль:** {author['name']}")
             st.info(f"**Описание стиля:** {author['description']}")
+            
             with st.expander("📖 Посмотреть фрагмент стиля"):
-                st.text(author['fragment'])
+                st.text_area("Фрагмент произведения:", author['fragment'], height=200, key=f"fragment_{st.session_state.selected_style}")
         else:
             st.info("⚪ Стиль не выбран - будет использован нейтральный литературный стиль")
         
@@ -503,7 +516,7 @@ def main():
         st.session_state.alias = alias
         
         # Кнопка перехода к генерации
-        if st.button("🎭 Начать создание повести", type="primary"):
+        if st.button("🎭 Начать создание повести", type="primary", key="start_creation"):
             if not genre or not setting:
                 st.warning("⚠️ Пожалуйста, заполните жанр и сеттинг")
             else:
