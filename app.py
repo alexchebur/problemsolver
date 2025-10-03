@@ -192,7 +192,7 @@ def generate_structure(genre, setting, alias, temperature):
             alias_text=alias_text
         )
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         # Используем настройки генерации с заданной температурой
         generation_config = genai.types.GenerationConfig(
