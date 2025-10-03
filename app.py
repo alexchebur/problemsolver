@@ -192,7 +192,7 @@ def generate_structure(genre, setting, alias, temperature):
             alias_text=alias_text
         )
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         # Используем настройки генерации с заданной температурой
         generation_config = genai.types.GenerationConfig(
@@ -230,7 +230,7 @@ def generate_chapter(genre, setting, alias, structure, previous_chapters, chapte
             word_count=word_count
         )
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         # Фиксированные настройки для генерации глав - низкая температура для консистентности
         generation_config = genai.types.GenerationConfig(
@@ -291,7 +291,7 @@ def generate_critique(full_story):
     try:
         prompt = CRITIQUE_PROMPT.format(full_story=full_story)
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         generation_config = genai.types.GenerationConfig(
             temperature=0.7,  # Средняя температура для баланса строгости и креативности
