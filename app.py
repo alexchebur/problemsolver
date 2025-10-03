@@ -224,7 +224,7 @@ def generate_chapter(genre, setting, alias, structure, previous_chapters, chapte
             setting=setting,
             alias_text=alias_text,
             structure=structure,
-            previous_chapters=previous_chapters_text,
+            #previous_chapters=previous_chapters_text,
             chapter_number=chapter_number,
             chapter_details=chapter_details,
             word_count=word_count
