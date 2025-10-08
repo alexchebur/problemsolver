@@ -281,7 +281,7 @@ def generate_structure(genre, setting, alias, temperature, style_instruction):
             style_instruction=style_instruction
         )
         
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         
         # Используем настройки генерации с заданной температурой
         generation_config = genai.types.GenerationConfig(
