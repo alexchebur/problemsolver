@@ -55,15 +55,24 @@ def create_map(width, height):
         map_data[player_pos[0]][player_pos[1]] = Tile.PLAYER
         empty_cells.remove(player_pos)
         
-        exit_pos = random.choice(empty_cells)
-        map_data[exit_pos[0]][exit_pos[1]] = Tile.EXIT
-        empty_cells.remove(exit_pos)
+        # Добавляем выход
+        if empty_cells:
+            exit_pos = random.choice(empty_cells)
+            map_data[exit_pos[0]][exit_pos[1]] = Tile.EXIT
+            empty_cells.remove(exit_pos)
         
         # Добавляем случайных врагов и предметы
-        for _ in range(min(5, len(empty_cells))):
-            pos = random.choice(empty_cells)
-            map_data[pos[0]][pos[1]] = random.choice([Tile.ENEMY, Tile.ITEM])
-            empty_cells.remove(pos)
+        num_entities = min(5, len(empty_cells) // 2)
+        for _ in range(num_entities):
+            if empty_cells:
+                pos = random.choice(empty_cells)
+                map_data[pos[0]][pos[1]] = Tile.ENEMY
+                empty_cells.remove(pos)
+            
+            if empty_cells:
+                pos = random.choice(empty_cells)
+                map_data[pos[0]][pos[1]] = Tile.ITEM
+                empty_cells.remove(pos)
     
     return map_data, player_pos
 
@@ -84,26 +93,29 @@ def move_player(map_data, player_pos, direction):
     
     if 0 <= new_y < len(map_data) and 0 <= new_x < len(map_data[0]):
         if map_data[new_y][new_x] in [Tile.FLOOR, Tile.ENEMY, Tile.ITEM, Tile.EXIT]:
+            # Сохраняем тип тайла, на который переходим (для проверки квеста)
+            target_tile = map_data[new_y][new_x]
+            
+            # Перемещаем игрока
             map_data[y][x] = Tile.FLOOR
             map_data[new_y][new_x] = Tile.PLAYER
-            return (new_y, new_x)
-    return player_pos
+            
+            return (new_y, new_x), target_tile
+    return player_pos, None
 
-def check_quest_progress(map_data, player_pos, quest):
-    y, x = player_pos
-    current_tile = map_data[y][x]
-    
-    if quest["type"] == QuestType.KILL and current_tile == Tile.ENEMY:
+def check_quest_progress(quest, target_tile):
+    if target_tile is None:
+        return None
+        
+    if quest["type"] == QuestType.KILL and target_tile == Tile.ENEMY:
         quest["completed"] = True
-        map_data[y][x] = Tile.FLOOR
-        return "Вы убили врага и выполнили задание!"
+        return f"Вы убили врага! Задание выполнено!"
     
-    elif quest["type"] == QuestType.COLLECT and current_tile == Tile.ITEM:
+    elif quest["type"] == QuestType.COLLECT and target_tile == Tile.ITEM:
         quest["completed"] = True
-        map_data[y][x] = Tile.FLOOR
-        return "Вы нашли предмет и выполнили задание!"
+        return f"Вы нашли предмет! Задание выполнено!"
     
-    elif current_tile == Tile.EXIT:
+    elif target_tile == Tile.EXIT:
         if quest["completed"]:
             return "Поздравляем! Вы выполнили задание и нашли выход!"
         else:
@@ -111,61 +123,129 @@ def check_quest_progress(map_data, player_pos, quest):
     
     return None
 
+def render_map(map_data):
+    return "\n".join("".join(tile.value for tile in row) for row in map_data)
+
 def main():
-    st.title("Roguelike Игра")
+    st.title("🗡️ Roguelike Игра")
     
-    if "map" not in st.session_state:
+    # Инициализация состояния игры
+    if "game_initialized" not in st.session_state:
         st.session_state.map, st.session_state.player_pos = create_map(20, 10)
         st.session_state.quest = generate_quest()
-        st.session_state.message = "Добро пожаловать в подземелье!"
+        st.session_state.message = "Добро пожаловать в подземелье! Используйте кнопки для перемещения."
+        st.session_state.game_initialized = True
+        st.session_state.game_over = False
     
     # Отображение карты
-    map_display = "\n".join("".join(tile.value for tile in row) for row in st.session_state.map)
-    st.text_area("Карта", map_display, height=300)
+    st.subheader("Карта подземелья")
+    map_display = render_map(st.session_state.map)
+    st.text_area("", map_display, height=300, key="map_display")
     
     # Отображение задания
+    st.subheader("📜 Задание")
     quest = st.session_state.quest
-    st.subheader("Текущее задание:")
-    st.write(f"{quest['type'].value} {quest['target']}")
+    quest_text = f"{quest['type'].value} {quest['target']}"
     
     if quest["completed"]:
-        st.success("Задание выполнено! Найдите выход (X).")
+        st.success(f"✅ {quest_text} - ВЫПОЛНЕНО!")
+        st.info("Найдите выход (X) чтобы завершить игру!")
+    else:
+        st.warning(f"🎯 {quest_text}")
+    
+    # Легенда
+    st.subheader("📖 Легенда")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.text("@ - Игрок")
+    with col2:
+        st.text("# - Стена")
+    with col3:
+        st.text(". - Пол")
+    with col4:
+        st.text("E - Враг")
+    with col5:
+        st.text("! - Предмет")
     
     # Управление
-    st.subheader("Управление")
+    st.subheader("🎮 Управление")
+    
+    # Верхний ряд кнопок
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col2:
+        if st.button("↑ Вверх", key="up", use_container_width=True):
+            if not st.session_state.game_over:
+                new_pos, target_tile = move_player(st.session_state.map, st.session_state.player_pos, Direction.UP)
+                st.session_state.player_pos = new_pos
+                
+                message = check_quest_progress(st.session_state.quest, target_tile)
+                if message:
+                    st.session_state.message = message
+                    if target_tile == Tile.EXIT and st.session_state.quest["completed"]:
+                        st.session_state.game_over = True
+    
+    # Средний ряд кнопок
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        if st.button("↑ Вверх"):
-            st.session_state.player_pos = move_player(st.session_state.map, st.session_state.player_pos, Direction.UP)
-    
-    with col2:
-        if st.button("← Лево"):
-            st.session_state.player_pos = move_player(st.session_state.map, st.session_state.player_pos, Direction.LEFT)
-        if st.button("→ Право"):
-            st.session_state.player_pos = move_player(st.session_state.map, st.session_state.player_pos, Direction.RIGHT)
+        if st.button("← Лево", key="left", use_container_width=True):
+            if not st.session_state.game_over:
+                new_pos, target_tile = move_player(st.session_state.map, st.session_state.player_pos, Direction.LEFT)
+                st.session_state.player_pos = new_pos
+                
+                message = check_quest_progress(st.session_state.quest, target_tile)
+                if message:
+                    st.session_state.message = message
+                    if target_tile == Tile.EXIT and st.session_state.quest["completed"]:
+                        st.session_state.game_over = True
     
     with col3:
-        if st.button("↓ Вниз"):
-            st.session_state.player_pos = move_player(st.session_state.map, st.session_state.player_pos, Direction.DOWN)
+        if st.button("→ Право", key="right", use_container_width=True):
+            if not st.session_state.game_over:
+                new_pos, target_tile = move_player(st.session_state.map, st.session_state.player_pos, Direction.RIGHT)
+                st.session_state.player_pos = new_pos
+                
+                message = check_quest_progress(st.session_state.quest, target_tile)
+                if message:
+                    st.session_state.message = message
+                    if target_tile == Tile.EXIT and st.session_state.quest["completed"]:
+                        st.session_state.game_over = True
     
-    # Проверка прогресса
-    message = check_quest_progress(
-        st.session_state.map,
-        st.session_state.player_pos,
-        st.session_state.quest
-    )
+    # Нижний ряд кнопок
+    col1, col2, col3 = st.columns([1, 1, 1])
     
-    if message:
-        st.session_state.message = message
+    with col2:
+        if st.button("↓ Вниз", key="down", use_container_width=True):
+            if not st.session_state.game_over:
+                new_pos, target_tile = move_player(st.session_state.map, st.session_state.player_pos, Direction.DOWN)
+                st.session_state.player_pos = new_pos
+                
+                message = check_quest_progress(st.session_state.quest, target_tile)
+                if message:
+                    st.session_state.message = message
+                    if target_tile == Tile.EXIT and st.session_state.quest["completed"]:
+                        st.session_state.game_over = True
     
-    st.info(st.session_state.message)
+    # Сообщения
+    st.subheader("📢 События")
+    if st.session_state.game_over:
+        st.balloons()
+        st.success(st.session_state.message)
+        st.success("🎉 Игра завершена! Начните новую игру.")
+    else:
+        st.info(st.session_state.message)
     
-    # Новая игра
-    if st.button("Новая игра"):
+    # Управление игрой
+    st.subheader("⚙️ Управление игрой")
+    if st.button("🔄 Новая игра"):
         st.session_state.map, st.session_state.player_pos = create_map(20, 10)
         st.session_state.quest = generate_quest()
-        st.session_state.message = "Добро пожаловать в подземелье!"
+        st.session_state.message = "Новая игра началась! Используйте кнопки для перемещения."
+        st.session_state.game_over = False
+        st.rerun()
+    
+    if st.button("🔍 Обновить отображение"):
         st.rerun()
 
 if __name__ == "__main__":
